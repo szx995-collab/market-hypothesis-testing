@@ -9,11 +9,15 @@
 - 独立、严格的 `ResearchHypothesisProposal`，用于从通用自然语言问题保存变量角色、概念变换、时间方向、样本/对齐草案、目标参数、H0/H1、歧义和不支持请求。
 - 供应商无关的 `HypothesisProposalService`、确定性 JSON/Schema/SHA-256、原子只创建持久化，以及离线 `hypothesis schema` / `hypothesis validate-proposal` CLI。
 - 显式联网、单请求且无重试的 `propose-hypothesis` DeepSeek 路径；Codex Plus 仍未实现。
+- 稳定 ambiguity ID、严格 `ClarificationAnswers`、白名单确定性应用及完整 Proposal 再验证。
+- 绑定规范化 Proposal SHA-256 的显式确认记录，以及只映射已确认字段的确定性 ResearchSpec 编译器。
+- ResearchSpec canonical serialization、确认 provenance sidecar 和离线澄清/确认/编译 CLI。
 
 ### Security
 
 - 拒绝重复 JSON key、非标准浮点、Markdown 包裹、未知字段、路径/命令/凭据/供应商身份/Bundle 身份进入生成字段，并在模型调用前检查 Key、网络授权和输出冲突。
 - DeepSeek 假设草案与固定 WTI plan provider 复用同一套官方 HTTPS 主机、超时、响应大小和清洗传输边界。
+- 澄清、确认和 ResearchSpec 输出拒绝重复 JSON key、非有限数、未知字段、符号链接、静默覆盖与哈希不匹配；缺少必填映射时不创建伪造 ResearchSpec。
 
 ## [0.1.0] - 2026-08-05
 

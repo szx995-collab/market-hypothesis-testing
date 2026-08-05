@@ -75,6 +75,16 @@ class WorkflowCliExitCode(IntEnum):
     HYPOTHESIS_BACKEND_IDENTITY_MISMATCH = 27
     HYPOTHESIS_OUTPUT_CONFLICT = 28
     HYPOTHESIS_OUTPUT_ERROR = 29
+    INVALID_HYPOTHESIS_CLARIFICATIONS = 30
+    HYPOTHESIS_CLARIFICATION_MISMATCH = 31
+    HYPOTHESIS_CLARIFICATION_CONFLICT = 32
+    HYPOTHESIS_PROPOSAL_NOT_READY = 33
+    INVALID_HYPOTHESIS_CONFIRMATION = 34
+    HYPOTHESIS_CONFIRMATION_MISMATCH = 35
+    RESEARCH_SPEC_UNRESOLVED = 36
+    RESEARCH_SPEC_INVALID = 37
+    HYPOTHESIS_REVIEW_OUTPUT_CONFLICT = 38
+    HYPOTHESIS_REVIEW_OUTPUT_ERROR = 39
 
 
 WORKFLOW_ERROR_EXIT_CODES = {
@@ -169,18 +179,22 @@ def emit_error(
     message: str,
     stage: str,
     *,
+    details: dict[str, object] | None = None,
     stream: TextIO | None = None,
 ) -> None:
     target = stream if stream is not None else sys.stderr
+    error: dict[str, object] = {
+        "code": code,
+        "message": message,
+        "stage": stage,
+    }
+    if details is not None:
+        error["details"] = details
     target.write(
         _stable_json(
             {
                 "ok": False,
-                "error": {
-                    "code": code,
-                    "message": message,
-                    "stage": stage,
-                },
+                "error": error,
             }
         )
         + "\n"

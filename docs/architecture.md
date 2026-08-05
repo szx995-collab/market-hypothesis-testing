@@ -4,7 +4,7 @@
 
 系统未来采用显式状态流转。LLM 只承担自然语言理解、研究规划草拟和结果解释；可验证的数据转换、计算与统计检验由确定性 Python 代码承担。任何 LLM 输出都不能替代原始数据、可执行计算或用户确认。
 
-当前仓库实现 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约、显式授权的 FRED 官方 HTTPS 适配器，以及独立的通用 `ResearchHypothesisProposal` 草案层；下述通用 ResearchSpec 编译、跨市场对齐、分析及报告执行仍是后续开发契约，不代表现有功能。
+当前仓库实现 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约、显式授权的 FRED 官方 HTTPS 适配器，以及独立的通用 `ResearchHypothesisProposal` 草案、结构化澄清、哈希绑定确认和确定性 ResearchSpec 编译层；通用数据绑定、跨市场对齐执行、分析及报告执行仍是后续开发契约，不代表现有功能。
 
 ## 通用假设草案边界
 
@@ -14,9 +14,11 @@ LLM 只选择可审阅的结构和 `target_parameter`/`direction`。Python 根�
 
 该阶段的状态流为：
 
-`自然语言问题` → `不可信 LLM Proposal` → `确定性严格解析与数学校验` → `用户澄清/确认` → `后续 ResearchSpec（尚未实现）`
+`自然语言问题` → `不可信 LLM Proposal` → `确定性严格解析与数学校验` → `结构化澄清` → `ready` → `用户显式确认 Proposal hash` → `确定性 ResearchSpec`
 
-验证或生成草案不会确认用户意图、下载数据、构造 ResearchSpec、编译 workflow 或执行统计。
+澄清只能修改白名单字段，并在每次应用后重新执行完整 Proposal 验证。Ready 不等于 Confirmed；Confirmed 不等于已执行。只有匹配规范化 Proposal SHA-256 的显式确认才能进入 ResearchSpec 编译。编译器只映射已确认且能明确映射的字段；若缺少 instrument/field、样本、对齐、复权/修订、多重检验、稳健性或限制等现有 ResearchSpec 必填项，则返回结构化 unresolved requirements，不使用虚构默认值。
+
+ResearchSpec 编译是纯 Python 操作，不调用 LLM、网络、数据源或 shell。输出必须通过现有 ResearchSpec 验证与 canonical serialization，并使用 sidecar 保存 Proposal hash、confirmation hash 和审计时间。确认或生成 ResearchSpec 不会下载数据、编译 workflow 或执行统计。
 
 ## ResearchSpec 领域边界
 

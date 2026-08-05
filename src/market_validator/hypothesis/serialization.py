@@ -123,7 +123,11 @@ def serialize_research_hypothesis_proposal(
     try:
         payload = (
             json.dumps(
-                proposal.model_dump(mode="json", exclude_computed_fields=True),
+                proposal.model_dump(
+                    mode="json",
+                    exclude_computed_fields=True,
+                    exclude_unset=True,
+                ),
                 ensure_ascii=False,
                 sort_keys=True,
                 separators=(",", ":"),

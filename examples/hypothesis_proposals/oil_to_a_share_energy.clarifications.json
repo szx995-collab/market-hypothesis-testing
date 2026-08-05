@@ -1,0 +1,79 @@
+{
+  "clarification_schema_version": "1.0",
+  "proposal_sha256": "38da48a8329ac3297e9dc64a444d2c5d3e5ae873bb3d987231a9c976aeb059fe",
+  "answers": [
+    {
+      "ambiguity_id": "ambiguity-958d7232ba8f31d4",
+      "update": {
+        "sample": {
+          "start_date": "2015-01-01",
+          "end_date": "2024-12-31"
+        }
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-78428dac6b3081a0",
+      "update": {
+        "variables": [
+          {
+            "variable_id": "international_oil_return",
+            "asset_type": "commodity_spot"
+          }
+        ]
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-5ba0f8e83c9178e5",
+      "update": {
+        "variables": [
+          {
+            "variable_id": "international_oil_return",
+            "transformation": "log_return"
+          },
+          {
+            "variable_id": "a_share_energy_return",
+            "transformation": "log_return"
+          }
+        ]
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-be21a5c2d46aba25",
+      "update": {
+        "variables": [
+          {
+            "variable_id": "a_share_energy_return",
+            "asset_type": "sector_index",
+            "proxy_for": null
+          }
+        ]
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-bbf852d67fed32dc",
+      "update": {
+        "alignment": {
+          "target_calendar": "China A-share trading calendar",
+          "information_cutoff": {
+            "type": "before_target_open"
+          }
+        }
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-66ae353e2cbf6591",
+      "update": {
+        "controls": []
+      }
+    },
+    {
+      "ambiguity_id": "ambiguity-c77491fa07461133",
+      "update": {
+        "statistical_hypothesis": {
+          "significance_level": 0.05,
+          "minimum_effect_size": 0.001
+        }
+      }
+    }
+  ]
+}

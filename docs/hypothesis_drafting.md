@@ -10,13 +10,15 @@ not a confirmed `ResearchSpec`, a data request, or an analysis result.
 natural-language question
 → optional LLM emits an untrusted proposal
 → deterministic Python strictly parses and validates it
-→ user resolves ambiguities and reviews the mathematics
-→ a later stage may create a confirmed ResearchSpec
+→ user supplies structured answers for stable ambiguity IDs
+→ Python applies only whitelisted fields and reruns full validation
+→ user explicitly confirms the canonical proposal SHA-256
+→ Python deterministically compiles the existing ResearchSpec contract
 ```
 
-No current command converts this proposal into a ResearchSpec. Validation also
-does not authorize network data access, compilation, workflow execution, or
-artifact publication.
+Ready is not confirmed, and confirmed is not executed. ResearchSpec generation
+does not authorize network data access, data download, workflow execution, or
+analysis artifact publication.
 
 ## Model structure
 
@@ -86,6 +88,43 @@ required review item forces `ready_for_spec_review=false`. This is still a
 valid proposal: “valid” means safe and structurally honest, not complete or
 confirmed.
 
+## Structured clarification
+
+Each current ambiguity receives a deterministic ID derived from its position
+and exact text. `ClarificationAnswers` binds answers to the canonical source
+proposal SHA-256 and accepts only whitelisted updates to variables, sample,
+alignment, statistical settings, controls, or explicit ResearchSpec compilation
+inputs. Unknown or duplicate IDs, conflicting field updates, duplicate JSON
+keys, non-finite numbers, extra text, and unknown fields fail closed.
+
+Python applies the answers without a second model call, regenerates H0/H1, and
+reruns the complete proposal validator. Partial answers produce a new proposal
+that remains not ready. Clarification cannot remove an unsupported request or
+turn causal, trading, order-execution, or backtest intent into supported
+research. The source proposal is never modified in place.
+
+## Explicit confirmation and deterministic compilation
+
+`ResearchHypothesisProposalConfirmation` records an explicit fixed statement,
+`confirmed=true`, a timezone-aware audit time, and the exact canonical proposal
+SHA-256. A proposal with ambiguities, unsupported requests, or readiness
+blockers cannot be confirmed. Changing any effective proposal field changes the
+canonical hash and invalidates the old confirmation. A confirmation record is
+not a digital signature and grants no data, network, workflow, or execution
+authority.
+
+The compiler maps only confirmed values into the existing `ResearchSpec`:
+claim type, roles, transformations, non-negative lags, sample, alignment,
+method, deterministic H0/H1, direction, significance level, minimum effect,
+assumptions, and explicitly supplied compilation inputs. It never invents an
+instrument, field, provider symbol, sample bound, adjustment/revision rule,
+join policy, robustness check, or limitation. Missing mandatory mappings return
+structured `unresolved_requirements`; no placeholder ResearchSpec is emitted.
+
+Canonical ResearchSpec bytes are persisted with a strict provenance sidecar
+containing proposal hash, confirmation hash and audit metadata. Both files are
+create-only, strictly reloaded, and never trigger data planning or analysis.
+
 ## LLM and Python responsibilities
 
 The LLM receives only the original question, fixed system prompt, JSON Schema,
@@ -122,6 +161,39 @@ python -m market_validator hypothesis validate-proposal `
   examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
 ```
 
+Inspect stable ambiguity IDs and validate the checked-in seven answers:
+
+```powershell
+python -m market_validator hypothesis validate-proposal `
+  examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
+python -m market_validator hypothesis clarification-schema
+python -m market_validator hypothesis validate-clarifications `
+  --proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json `
+  --answers examples/hypothesis_proposals/oil_to_a_share_energy.clarifications.json
+```
+
+Create new files without changing the source proposal:
+
+```powershell
+python -m market_validator hypothesis apply-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json> `
+  --output <clarified-proposal.json>
+python -m market_validator hypothesis confirm-proposal `
+  --proposal <clarified-proposal.json> `
+  --output <confirmation.json>
+python -m market_validator hypothesis compile-research-spec `
+  --proposal <clarified-proposal.json> `
+  --confirmation <confirmation.json> `
+  --output <research-spec.json>
+```
+
+The oil example's seven answers make the conceptual Proposal ready and
+confirmable, but intentionally do not invent provider-neutral instrument/field
+metadata, minimum observations, join and missing-data policies, robustness
+checks, or limitations. Its compile step therefore returns those fields as
+structured unresolved requirements instead of fabricating a ResearchSpec.
+
 The example identifies a positive predictive lead-lag regression and the oil
 predictor's `beta`, with `H0: beta <= 0` and `H1: beta > 0`. It intentionally
 remains not ready because the date range, oil instrument, return definitions,
@@ -144,11 +216,8 @@ an existing output fails before a model request. A successful call writes only
 one canonical proposal file. It does not create confirmation, ResearchSpec,
 WorkflowPlan, data, analysis, report, or artifact files.
 
-## Next-stage boundary
+## Remaining boundary
 
-A future implementation may add a hash-bound user clarification/confirmation
-record and a deterministic compiler from a complete confirmed hypothesis
-proposal to `ResearchSpec`. That compiler must preserve the confirmed variable
-roles, mathematics, dates, alignment, assumptions, and limitations, and must
-stop rather than guess any remaining field. It is not implemented in this
-stage.
+This stage ends at a strictly validated ResearchSpec. It does not select or
+download data, calculate market calendars, compile a generic analysis workflow,
+execute correlation/regression, backtest, publish a report, or place trades.
