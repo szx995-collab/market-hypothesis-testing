@@ -25,6 +25,6 @@
 
 ## 当前阶段边界
 
-当前完成 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约、首个显式调用的网络数据适配器 `FredProvider`，以及只能生成不可信 `MarketValidationPlanProposal` 的可选 AI provider。AI provider 必须显式授权联网，只能接收问题、固定提示、Schema 和能力说明；不得确认、绑定 Bundle、编译或执行 workflow。FRED 只允许 HTTPS 官方主机、经核验映射和显式 `allow_network=True`/`--live`；默认状态检查与 dry-run 不联网。每次成功 live fetch 必须保存原始响应、哈希、标准化数据包和无密钥 manifest。通用自然语言转换、模型供应商自动路由、跨市场对齐计算、通用统计分析和回测仍不可用，不得描述为已有能力。
+当前完成 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约、首个显式调用的网络数据适配器 `FredProvider`，以及两种彼此独立的不可信 AI 草案：固定 WTI workflow 使用的 `MarketValidationPlanProposal`，和把通用自然语言问题结构化为变量、时间关系、方法、检验方向与待澄清项的 `ResearchHypothesisProposal`。通用假设草案尚不能确认或转换为 ResearchSpec。AI provider 必须显式授权联网，只能接收问题、固定提示、Schema 和能力说明；不得确认、绑定 Bundle、编译或执行 workflow。FRED 只允许 HTTPS 官方主机、经核验映射和显式 `allow_network=True`/`--live`；默认状态检查与 dry-run 不联网。每次成功 live fetch 必须保存原始响应、哈希、标准化数据包和无密钥 manifest。通用数据获取、跨市场对齐计算、通用统计执行、回测和因果推断仍不可用，不得描述为已有能力。
 
 FRED 的修订策略必须显式选择；适配器不得替调用者静默选择 `latest_available` 或 `initial_release`。自动化任务从 `FRED_API_KEY` 读取 Key；只有调用者显式启用 interactive 时才可通过通用 CredentialResolver 安全输入。Key 只在当前进程内存中使用，不得出现在日志、异常、URL 元数据、文件名或持久化产物中。Tushare 因官方传输安全契约尚未确认而暂缓，不得猜测 HTTPS 端点或增加 Token 配置。

@@ -6,6 +6,11 @@ model request, but it can only generate proposal text. Strict parsing,
 confirmation, Bundle binding, compilation, workflow execution, and artifact
 verification remain separate deterministic boundaries.
 
+This document describes the fixed `price_change_volatility` planning contract.
+The independent general statistical-hypothesis draft contract is documented in
+[`hypothesis_drafting.md`](hypothesis_drafting.md); it does not compile to this
+WorkflowPlan and currently stops before confirmation or ResearchSpec creation.
+
 ```text
 natural-language question
 → optional AI provider emits an untrusted proposal

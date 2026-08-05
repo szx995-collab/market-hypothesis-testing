@@ -4,7 +4,19 @@
 
 系统未来采用显式状态流转。LLM 只承担自然语言理解、研究规划草拟和结果解释；可验证的数据转换、计算与统计检验由确定性 Python 代码承担。任何 LLM 输出都不能替代原始数据、可执行计算或用户确认。
 
-当前仓库实现 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约，以及显式授权的 FRED 官方 HTTPS 适配器；下述跨市场对齐、分析及报告执行仍是后续开发契约，不代表现有功能。
+当前仓库实现 `scaffold`、结构化模型后端接口、ResearchSpec 1.0、数据需求规划、离线 CSV 数据契约、显式授权的 FRED 官方 HTTPS 适配器，以及独立的通用 `ResearchHypothesisProposal` 草案层；下述通用 ResearchSpec 编译、跨市场对齐、分析及报告执行仍是后续开发契约，不代表现有功能。
+
+## 通用假设草案边界
+
+`ResearchHypothesisProposal` 属于 `hypothesis_draft`，与固定 WTI workflow 的 `MarketValidationPlanProposal` 相互独立。前者表达原始/规范化问题、association 或 predictive claim、唯一 outcome、predictors、controls、概念变换、时间关系、样本与对齐草案，以及 Pearson、Spearman、OLS 或 lead-lag regression 的目标参数和检验方向。它不能包含本地路径、供应商 symbol、Bundle/artifact 身份、哈希、凭据、命令或可执行代码。
+
+LLM 只选择可审阅的结构和 `target_parameter`/`direction`。Python 根据 correlation 的总体 `rho` 或 regression 的总体 `beta` 确定性验证 H0/H1，拒绝重复/未知变量引用、非严格 JSON、未来信息方向不明却声称 ready，以及把因果、回测或交易请求偷偷降级为关联研究。缺失时间范围、变换、market session/calendar、information cutoff、代理、换月、controls、显著性或效应阈值时，草案必须保留 `ambiguities` 并设置 `ready_for_spec_review=false`。
+
+该阶段的状态流为：
+
+`自然语言问题` → `不可信 LLM Proposal` → `确定性严格解析与数学校验` → `用户澄清/确认` → `后续 ResearchSpec（尚未实现）`
+
+验证或生成草案不会确认用户意图、下载数据、构造 ResearchSpec、编译 workflow 或执行统计。
 
 ## ResearchSpec 领域边界
 
@@ -26,12 +38,12 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 
 | 后端 | 路径 | 配置与认证边界 | 未来结构化输出方式 |
 | --- | --- | --- | --- |
-| `deepseek_api` | DeepSeek API | API Key 只从 `DEEPSEEK_API_KEY` 环境变量读取；Base URL 和模型分别来自 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_MODEL` | API 响应必须转换为统一的 `StructuredGenerationResult` |
+| `deepseek_api` | DeepSeek API | API Key 只从 `DEEPSEEK_API_KEY` 环境变量读取；Base URL 和模型分别来自 `DEEPSEEK_BASE_URL` 与 `DEEPSEEK_MODEL`；调用必须显式允许联网 | 单次、无重试、受限 HTTPS 响应转换为统一的 `StructuredGenerationResult` |
 | `codex_plus` | 本机 Codex CLI；不是普通 HTTP API | 复用 `codex login` 建立的登录，不使用 OpenAI API Key；项目不得读取、复制或解析 `~/.codex/auth.json` | 通过 `codex exec --output-schema` 获得结果，再转换为统一的 `StructuredGenerationResult` |
 
 状态诊断不得调用模型。DeepSeek 诊断只检查相关环境变量是否存在，不验证或暴露密钥；Codex Plus 诊断只检查 CLI，并可执行有超时的 `codex login status`。无法可靠判断 Codex 登录属于 ChatGPT 还是 API Key 时，认证方式必须记为 `unknown`。
 
-模型输出仅可用于自然语言理解、规划和解释。数据处理、数值计算、统计检验、稳健性检验和结果校验仍必须由确定性 Python 代码完成。当前两个后端的 `generate()` 均明确未实现，因此不会产生模型调用、网络请求或费用。
+模型输出仅可用于自然语言理解、规划和解释。数据处理、数值计算、统计检验、稳健性检验和结果校验仍必须由确定性 Python 代码完成。`DeepSeekApiBackend.generate()` 只有在调用者显式启用网络、配置 Key 并提供模型时才允许一次受限请求；默认诊断和所有测试离线。`CodexPlusBackend.generate()` 仍明确未实现。
 
 ## 状态定义
 
