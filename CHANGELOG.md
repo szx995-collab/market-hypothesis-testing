@@ -1,8 +1,10 @@
 # Changelog
 
-本项目遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 的结构。正式版本策略将在首次发布前确定。
+本项目遵循 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 的结构。
 
 ## [Unreleased]
+
+## [0.1.0] - 2026-08-05
 
 ### Added
 
@@ -26,6 +28,5 @@
 - 完善包元数据、源码发行清单、`.gitignore` 和发布文档。
 - 为 Windows 声明 IANA 时区数据库条件依赖，确保全新安装后的 `zoneinfo` 验证可用。
 
-## Release status
-
-尚未发布正式版本。首次公开仓库使用 MIT License，README 采用中英双语。
+[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/szx995-collab/market-hypothesis-testing/releases/tag/v0.1.0
