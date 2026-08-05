@@ -1,0 +1,58 @@
+{
+  "completion_schema_version": "1.0",
+  "source_proposal_sha256": "c53e6c96416b196c42f0325d1a7542023ab3e3ae3ce40afa9218fa00b9dfaa26",
+  "source_confirmation_sha256": null,
+  "research_spec_inputs": {
+    "spec_id": "oil-to-a-share-energy-v1",
+    "title": "International oil returns and next tradable A-share energy sector index returns",
+    "variables": [
+      {
+        "variable_id": "a_share_energy_return",
+        "instrument": {
+          "instrument_id": "cn.a_share.energy.sector_index_review",
+          "display_name": "China A-share energy sector index",
+          "asset_type": "sector_index",
+          "market": "中国 A 股市场",
+          "exchange_or_venue": "China securities market",
+          "timezone": "Asia/Shanghai",
+          "currency": "CNY",
+          "unit": "index points",
+          "continuous_contract": false
+        },
+        "field": "close",
+        "availability_lag_periods": 0,
+        "price_adjustment": null,
+        "rolling_window_periods": null
+      },
+      {
+        "variable_id": "international_oil_return",
+        "instrument": {
+          "instrument_id": "global.crude_oil.spot_reference",
+          "display_name": "International crude-oil spot reference price",
+          "asset_type": "commodity_spot",
+          "market": "International crude oil spot market",
+          "exchange_or_venue": "International energy reference venue",
+          "timezone": "America/New_York",
+          "currency": "USD",
+          "unit": "USD per barrel",
+          "continuous_contract": false
+        },
+        "field": "spot_reference",
+        "availability_lag_periods": 0,
+        "price_adjustment": null,
+        "rolling_window_periods": null
+      }
+    ],
+    "minimum_observations": 500,
+    "join_policy": "last_completed_before_cutoff",
+    "max_staleness_days": 3,
+    "missing_data_policy": "drop_observation",
+    "multiple_testing_correction": "none",
+    "robustness_checks": [],
+    "limitations": [
+      "Predictive association does not establish that oil-price changes cause sector returns."
+    ]
+  },
+  "completion_statement": "I explicitly provide the missing ResearchSpec compilation inputs for this exact Proposal.",
+  "completed_at": "2026-08-05T00:00:00Z"
+}

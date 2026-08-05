@@ -37,6 +37,15 @@ from market_validator.hypothesis.confirmation import (
     serialize_research_hypothesis_confirmation,
     validate_confirmation_matches_proposal,
 )
+from market_validator.hypothesis.completion import (
+    AppliedResearchSpecCompletion,
+    ResearchSpecCompletionAnswers,
+    apply_research_spec_completion_answers,
+    parse_research_spec_completion_answers,
+    persist_completed_research_hypothesis_proposal,
+    research_spec_completion_json_schema,
+    serialize_research_spec_completion_answers,
+)
 from market_validator.hypothesis.lifecycle import (
     HypothesisLifecycleError,
     HypothesisLifecycleErrorCode,
@@ -88,6 +97,13 @@ __all__ = [
     "ResearchSpecProvenance",
     "ResearchSpecVariableInputs",
     "PersistedResearchSpec",
+    "AppliedResearchSpecCompletion",
+    "ResearchSpecCompletionAnswers",
+    "apply_research_spec_completion_answers",
+    "parse_research_spec_completion_answers",
+    "persist_completed_research_hypothesis_proposal",
+    "research_spec_completion_json_schema",
+    "serialize_research_spec_completion_answers",
     "StatisticalHypothesisSpec",
     "TargetParameterKind",
     "TargetParameterSpec",

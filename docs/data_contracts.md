@@ -24,6 +24,14 @@ ResearchSpec
 
 先规划再调用供应商能让系统在读取数据前发现身份冲突、缺少映射和所需历史窗口。规划器不读取或执行 `model.formula`；该字段目前只供人阅读。
 
+### DataPlan 生命周期与确认
+
+`DataPlan` 生命周期由 `data_plan_review` 提供：`generate` 严格重验证 ResearchSpec 与双 registry snapshot 后调用 `plan_data_requirements`，`validate` 做 strict JSON/canonical SHA-256 回读，`confirm` 只接受完全 ready 的 DataPlan。DataPlan identity 绑定 ResearchSpec、DataPlan 与 InstrumentRegistry/CalendarRegistry 各自 canonical snapshot 的完整 SHA-256；`plan_id` 仍是短摘要，完整绑定在 `GeneratedDataPlan` 与 `DataPlanConfirmation` 中。
+
+一个 requirement 只有在以下条件全部满足时才可确认：instrument identity 已注册且 `identity_status=verified`、registry 元数据与 ResearchSpec 一致、calendar 存在、至少存在一个 `verified=True` 的 provider mapping，且 field/frequency/sample/transformation/lag/revision 信息完整、cross-market alignment 完整、无 unresolved instrument 与阻塞性 warning。缺失或未验证的映射保持 `UNRESOLVED`；多个 verified mapping 保留给后续来源选择，绝不自动选择。
+
+`DataPlanConfirmation` 绑定四个 canonical SHA-256（research_spec、data_plan、instrument_registry、calendar_registry）与固定确认声明，只表示“该 provider-neutral DataPlan 可供后续来源选择审查”，不授权网络、下载、Provider 请求、付费、分析、回测、交易或下单。任一有效内容改变（spec、plan、任一 registry snapshot）都会使旧确认失效。输出使用原子只创建持久化，provenance sidecar 记录全部相关哈希与审计时间（审计时间不进入 DataPlan 确定性内容）。
+
 ### required_pre_sample_periods
 
 这个字段表示在正式样本开始前，计算转换和滞后至少需要多少个原始目标频率观测：

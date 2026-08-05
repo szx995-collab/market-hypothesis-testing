@@ -18,6 +18,10 @@ from market_validator.backends.config import (
 )
 from market_validator.backends.deepseek_api import DeepSeekApiBackend
 from market_validator.data.cli import add_data_parser, handle_data_command
+from market_validator.data_plan_cli import (
+    add_data_plan_parsers,
+    handle_data_plan_cli_command,
+)
 from market_validator.hypothesis_cli import (
     add_hypothesis_parsers,
     handle_hypothesis_cli_command,
@@ -52,6 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     add_data_parser(subparsers)
     add_workflow_parsers(subparsers)
     add_hypothesis_parsers(subparsers)
+    add_data_plan_parsers(subparsers)
     return parser
 
 
@@ -172,5 +177,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command in {"hypothesis", "propose-hypothesis"}:
         return handle_hypothesis_cli_command(args)
+
+    if args.command == "data-plan":
+        return handle_data_plan_cli_command(args)
 
     return 2

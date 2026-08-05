@@ -98,6 +98,50 @@ removing such fields changes the hash and invalidates an older confirmation.
 A confirmation is a consistency binding and audit record, not identity
 authentication.
 
+When compilation returns `unresolved_requirements`, the user supplies explicit
+provider-neutral completion answers offline. Completion creates a new Proposal
+version (only `research_spec_inputs` may be set), invalidates the old
+confirmation, and requires a fresh explicit confirmation before compilation:
+
+```powershell
+market-validator hypothesis completion-schema
+market-validator hypothesis validate-completion `
+  --proposal <clarified-proposal.json> `
+  --answers <completion-answers.json>
+market-validator hypothesis apply-completion `
+  --proposal <clarified-proposal.json> `
+  --answers <completion-answers.json> `
+  --output <completed-proposal.json>
+```
+
+The provider-neutral DataPlan lifecycle is deterministic and fully offline:
+
+```powershell
+market-validator data-plan generate `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan.json>
+market-validator data-plan validate --plan <data-plan.json>
+market-validator data-plan confirmation-schema
+market-validator data-plan confirm `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan-confirmation.json>
+market-validator data-plan validate-confirmation `
+  --confirmation <data-plan-confirmation.json> `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json>
+```
+
+A DataPlan with unresolved requirements or unverified registry identities
+cannot be confirmed; DataPlan confirmation never authorizes downloads, provider
+requests, analysis, backtesting, trading, or order placement.
+
 The only hypothesis command that may call a model is explicit and create-only:
 
 ```powershell

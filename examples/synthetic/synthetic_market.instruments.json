@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0",
+  "instruments": [
+    {
+      "instrument_id": "synthetic.test.outcome_index",
+      "display_name": "Synthetic test outcome index",
+      "asset_type": "equity_index",
+      "market": "Synthetic Test Market",
+      "exchange_or_venue": "Synthetic test venue",
+      "calendar_id": "synthetic.test.equity",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "index points",
+      "aliases": ["synthetic-outcome-index"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "synthetic_provider",
+          "provider_symbol": "SYNTH_OUTCOME",
+          "dataset_or_endpoint": "/synthetic/series",
+          "market": "Synthetic Test Market",
+          "verified": true,
+          "verified_on": "2026-08-05",
+          "verification_source_uri": "https://example.invalid/synthetic/outcome",
+          "notes": [
+            "TEST-ONLY synthetic mapping; example.invalid is a reserved non-routable domain and never a real data source."
+          ]
+        }
+      ],
+      "notes": [
+        "TEST-ONLY synthetic fixture; no real market identity is asserted."
+      ]
+    },
+    {
+      "instrument_id": "synthetic.test.predictor_series",
+      "display_name": "Synthetic test predictor series",
+      "asset_type": "equity_index",
+      "market": "Synthetic Test Market",
+      "exchange_or_venue": "Synthetic test venue",
+      "calendar_id": "synthetic.test.equity",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "index points",
+      "aliases": ["synthetic-predictor-series"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "synthetic_provider",
+          "provider_symbol": "SYNTH_PREDICTOR",
+          "dataset_or_endpoint": "/synthetic/series",
+          "market": "Synthetic Test Market",
+          "verified": true,
+          "verified_on": "2026-08-05",
+          "verification_source_uri": "https://example.invalid/synthetic/predictor",
+          "notes": [
+            "TEST-ONLY synthetic mapping; example.invalid is a reserved non-routable domain and never a real data source."
+          ]
+        }
+      ],
+      "notes": [
+        "TEST-ONLY synthetic fixture; no real market identity is asserted."
+      ]
+    }
+  ]
+}

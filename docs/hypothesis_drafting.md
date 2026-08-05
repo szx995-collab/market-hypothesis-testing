@@ -220,6 +220,87 @@ remains not ready because the date range, oil instrument, return definitions,
 energy-sector proxy, cross-market cutoff/calendar, controls, significance, and
 effect threshold still require user clarification.
 
+## Explicit ResearchSpec completion
+
+When compilation returns `unresolved_requirements`, the user can supply
+`ResearchSpecCompletionAnswers` offline. Completion is a Proposal-layer
+operation that only fills `research_spec_inputs` on a new Proposal version; it
+cannot modify claim type, outcome, predictors, controls, transformations, lags,
+sample, alignment draft, method, direction, H0/H1, assumptions, or unsupported
+requests. The answers bind the exact source Proposal SHA-256, so any effective
+Proposal change invalidates them. Applying completion:
+
+- creates a new Proposal version without modifying the source;
+- reruns the complete Proposal contract, safety, timing, future-information,
+  unsupported-request, and readiness validation;
+- changes the canonical Proposal hash, which automatically invalidates the old
+  confirmation;
+- never acts as a confirmation itself — the user must explicitly confirm the
+  new Proposal before any ResearchSpec can be compiled.
+
+A Proposal that already contains `research_spec_inputs` refuses a second
+completion source. Completion inputs must exactly cover the declared variables
+and their asset types; unknown, duplicate, missing, or conflicting mappings are
+rejected. There is no `--yes` or `--force` shortcut around re-confirmation.
+
+```powershell
+python -m market_validator hypothesis completion-schema
+python -m market_validator hypothesis validate-completion `
+  --proposal <clarified-proposal.json> `
+  --answers <completion-answers.json>
+python -m market_validator hypothesis apply-completion `
+  --proposal <clarified-proposal.json> `
+  --answers <completion-answers.json> `
+  --output <completed-proposal.json>
+```
+
+After completion, confirm the new Proposal and compile it exactly as before.
+The compiled ResearchSpec keeps the existing schema, canonical bytes,
+validation, provenance, and atomic create-only persistence.
+
+## Provider-neutral DataPlan
+
+A compiled `ResearchSpec` plus explicit `InstrumentRegistry` and
+`CalendarRegistry` snapshots deterministically produce a provider-neutral
+`DataPlan` (pure Python, offline, no clock reads, no randomness, no network, no
+LLM, no shell). DataPlan identity binds the canonical SHA-256 of the
+ResearchSpec, the DataPlan, and both registry snapshots. A requirement is ready
+for confirmation only when its instrument identity is registered and verified,
+its metadata matches the registry, its calendar exists, and at least one
+verified provider mapping exists under the current contract. Missing or
+unverified mappings keep the requirement unresolved; multiple verified mappings
+are preserved for later source-selection review and are never auto-selected.
+
+`DataPlanConfirmation` binds the exact canonical hashes and the fixed statement
+"I explicitly confirm this exact provider-neutral DataPlan for subsequent
+source-selection review." It is a consistency binding and audit record, not a
+digital signature or identity authentication, and it never authorizes network
+access, downloads, provider requests, paid services, analysis, backtesting,
+trading, or order placement. Any change to the DataPlan, ResearchSpec, or
+either registry snapshot invalidates the old confirmation.
+
+```powershell
+python -m market_validator data-plan generate `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan.json>
+python -m market_validator data-plan validate --plan <data-plan.json>
+python -m market_validator data-plan confirmation-schema
+python -m market_validator data-plan confirm `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan-confirmation.json>
+python -m market_validator data-plan validate-confirmation `
+  --confirmation <data-plan-confirmation.json> `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json>
+```
+
 An optional real proposal request is separate and never confirms or executes:
 
 ```powershell

@@ -20,7 +20,9 @@ from market_validator.hypothesis import (
     HypothesisProposalError,
     HypothesisProposalService,
     ResearchHypothesisProposal,
+    ResearchSpecCompletionAnswers,
     apply_clarification_answers,
+    apply_research_spec_completion_answers,
     calculate_research_hypothesis_proposal_sha256,
     clarification_answers_json_schema,
     compile_confirmed_research_spec,
@@ -29,12 +31,15 @@ from market_validator.hypothesis import (
     parse_clarification_answers,
     parse_research_hypothesis_confirmation,
     parse_research_hypothesis_proposal,
+    parse_research_spec_completion_answers,
     persist_clarified_proposal,
     persist_compiled_research_spec,
+    persist_completed_research_hypothesis_proposal,
     persist_generated_research_hypothesis_proposal,
     persist_research_hypothesis_confirmation,
     proposal_ambiguity_references,
     research_hypothesis_proposal_json_schema,
+    research_spec_completion_json_schema,
     validate_hypothesis_proposal_output_path,
 )
 from market_validator.hypothesis.serialization import HypothesisProposalErrorCode
@@ -96,6 +101,15 @@ HYPOTHESIS_LIFECYCLE_ERROR_EXIT_CODES = {
     HypothesisLifecycleErrorCode.CONFIRMATION_MISMATCH: (
         WorkflowCliExitCode.HYPOTHESIS_CONFIRMATION_MISMATCH
     ),
+    HypothesisLifecycleErrorCode.INVALID_COMPLETION: (
+        WorkflowCliExitCode.INVALID_RESEARCH_SPEC_COMPLETION
+    ),
+    HypothesisLifecycleErrorCode.COMPLETION_MISMATCH: (
+        WorkflowCliExitCode.RESEARCH_SPEC_COMPLETION_MISMATCH
+    ),
+    HypothesisLifecycleErrorCode.COMPLETION_CONFLICT: (
+        WorkflowCliExitCode.RESEARCH_SPEC_COMPLETION_CONFLICT
+    ),
     HypothesisLifecycleErrorCode.RESEARCH_SPEC_UNRESOLVED: (
         WorkflowCliExitCode.RESEARCH_SPEC_UNRESOLVED
     ),
@@ -148,6 +162,23 @@ def add_hypothesis_parsers(subparsers: argparse._SubParsersAction) -> None:
     apply_clarifications.add_argument("--proposal", required=True, type=Path)
     apply_clarifications.add_argument("--answers", required=True, type=Path)
     apply_clarifications.add_argument("--output", required=True, type=Path)
+    commands.add_parser(
+        "completion-schema",
+        help="print the strict ResearchSpec completion-answer JSON Schema",
+    )
+    validate_completion = commands.add_parser(
+        "validate-completion",
+        help="validate and apply completion answers in memory without writing output",
+    )
+    validate_completion.add_argument("--proposal", required=True, type=Path)
+    validate_completion.add_argument("--answers", required=True, type=Path)
+    apply_completion = commands.add_parser(
+        "apply-completion",
+        help="fill research_spec_inputs and create a new Proposal version",
+    )
+    apply_completion.add_argument("--proposal", required=True, type=Path)
+    apply_completion.add_argument("--answers", required=True, type=Path)
+    apply_completion.add_argument("--output", required=True, type=Path)
     commands.add_parser(
         "confirmation-schema",
         help="print the strict explicit-confirmation JSON Schema",
@@ -307,6 +338,53 @@ def _handle_apply_clarifications(args: argparse.Namespace) -> int:
     return int(WorkflowCliExitCode.SUCCESS)
 
 
+def _handle_completion_schema() -> int:
+    emit_success(research_spec_completion_json_schema())
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _load_completion_answers(path: Path) -> ResearchSpecCompletionAnswers:
+    return parse_research_spec_completion_answers(
+        _read_regular_utf8(path, label="research_spec_completion")
+    )
+
+
+def _handle_validate_completion(args: argparse.Namespace) -> int:
+    applied = apply_research_spec_completion_answers(
+        _load_proposal(args.proposal),
+        _load_completion_answers(args.answers),
+    )
+    emit_success(
+        {
+            "source_proposal_sha256": applied.source_proposal_sha256,
+            "completed_proposal_sha256": applied.completed_proposal_sha256,
+            "ready_for_spec_review": applied.proposal.ready_for_spec_review,
+            "research_spec_inputs_present": True,
+        }
+    )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_apply_completion(args: argparse.Namespace) -> int:
+    applied = apply_research_spec_completion_answers(
+        _load_proposal(args.proposal),
+        _load_completion_answers(args.answers),
+    )
+    output_path = persist_completed_research_hypothesis_proposal(
+        applied, args.output
+    )
+    emit_success(
+        {
+            "output_path": str(output_path),
+            "source_proposal_sha256": applied.source_proposal_sha256,
+            "completed_proposal_sha256": applied.completed_proposal_sha256,
+            "ready_for_spec_review": applied.proposal.ready_for_spec_review,
+            "previous_confirmation_invalidated": True,
+        }
+    )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
 def _handle_confirmation_schema() -> int:
     emit_success(confirmation_json_schema())
     return int(WorkflowCliExitCode.SUCCESS)
@@ -383,6 +461,12 @@ def handle_hypothesis_cli_command(args: argparse.Namespace) -> int:
                 return _handle_validate_clarifications(args)
             if args.hypothesis_command == "apply-clarifications":
                 return _handle_apply_clarifications(args)
+            if args.hypothesis_command == "completion-schema":
+                return _handle_completion_schema()
+            if args.hypothesis_command == "validate-completion":
+                return _handle_validate_completion(args)
+            if args.hypothesis_command == "apply-completion":
+                return _handle_apply_completion(args)
             if args.hypothesis_command == "confirmation-schema":
                 return _handle_confirmation_schema()
             if args.hypothesis_command == "confirm-proposal":

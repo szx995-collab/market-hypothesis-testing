@@ -13,12 +13,18 @@
 - 绑定规范化 Proposal SHA-256 的显式确认记录，以及只映射已确认字段的确定性 ResearchSpec 编译器。
 - ResearchSpec canonical serialization、确认 provenance sidecar 和离线澄清/确认/编译 CLI。
 - 锁定契约测试：Ready 不等于必然可编译（`follows_outcome` 等关系在编译期返回 unresolved 而非猜测）、Proposal hash 对字段显式性敏感、asset type/对齐冲突分支、controls 组合冲突确定性拒绝。
+- `ResearchSpecCompletionAnswers`：显式补全 `research_spec_inputs`，生成新 Proposal 版本、强制旧确认失效，且只能设置 `research_spec_inputs`（不允许修改 claim/变量/样本/对齐/method/H0/H1 等）。
+- 确定性 `DataPlan` 生命周期：严格序列化与 canonical SHA-256、registry canonical snapshot 哈希绑定、readiness 检查（verified identity + verified provider mapping）、`DataPlanConfirmation`（绑定 ResearchSpec/DataPlan/双 registry 哈希）、provenance sidecar 与原子只创建持久化。
+- 离线 CLI：`hypothesis completion-schema` / `validate-completion` / `apply-completion`，以及 `data-plan generate` / `validate` / `confirmation-schema` / `confirm` / `validate-confirmation`。
+- 端到端示例：油/A 股 completion 链（ResearchSpec 成功生成、DataPlan 保持 unresolved），以及明确标注 TEST-ONLY 的 synthetic 完整链路 fixture。
 
 ### Security
 
 - 拒绝重复 JSON key、非标准浮点、Markdown 包裹、未知字段、路径/命令/凭据/供应商身份/Bundle 身份进入生成字段，并在模型调用前检查 Key、网络授权和输出冲突。
 - DeepSeek 假设草案与固定 WTI plan provider 复用同一套官方 HTTPS 主机、超时、响应大小和清洗传输边界。
 - 澄清、确认和 ResearchSpec 输出拒绝重复 JSON key、非有限数、未知字段、符号链接、静默覆盖与哈希不匹配；缺少必填映射时不创建伪造 ResearchSpec。
+- 补全与 DataPlan 确认同样严格拒绝未知字段、重复 JSON key、非有限数、Markdown 围栏、JSON 外文本、哈希不匹配与覆盖；DataPlan 确认不触发网络、下载、Provider、分析、回测或 workflow。
+- 明确边界：DataPlan Ready ≠ DataPlan Confirmed；DataPlan Confirmed 不授权任何数据获取；verified mapping 不构成自动 provider 选择。
 - 文档明确：确认是绑定一致性记录而非数字签名或身份认证；重复确认因新审计时间与不可变确认文件冲突时不会静默覆盖；Proposal 身份基于当前 canonical 表示，显式默认值与省略可能产生不同 hash。
 
 ## [0.1.0] - 2026-08-05
