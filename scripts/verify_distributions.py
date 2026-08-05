@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tarfile
 import venv
 
 
@@ -185,6 +186,17 @@ def _distribution_hashes(dist: Path) -> dict[str, str]:
     return {artifact.name: _sha256(artifact) for artifact in artifacts}
 
 
+def _verify_sdist_members(artifact: Path) -> None:
+    with tarfile.open(artifact, mode="r:gz") as archive:
+        runtime_members = sorted(
+            member.name
+            for member in archive.getmembers()
+            if any(part.startswith(".runtime_") for part in member.name.split("/"))
+        )
+    if runtime_members:
+        raise ValueError("sdist contains runtime test artifacts")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dist", type=Path, required=True)
@@ -211,6 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         sdists = sorted(dist.glob("market_validator-*.tar.gz"))
         if len(wheels) != 1 or len(sdists) != 1:
             raise ValueError("dist must contain exactly one wheel and one sdist")
+        _verify_sdist_members(sdists[0])
         reproducible = None
         if reproducible_against is not None:
             if _distribution_hashes(dist) != _distribution_hashes(reproducible_against):
@@ -234,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
                 root=root,
             ),
         ]
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+    except (OSError, ValueError, subprocess.SubprocessError, tarfile.TarError) as exc:
         print(
             json.dumps(
                 {"ok": False, "error": type(exc).__name__},
