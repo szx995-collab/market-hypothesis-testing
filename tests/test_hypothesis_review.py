@@ -11,6 +11,7 @@ import unittest
 
 from market_validator.hypothesis import (
     ClarificationAnswers,
+    CompiledResearchSpec,
     HypothesisLifecycleError,
     HypothesisLifecycleErrorCode,
     ResearchHypothesisProposalConfirmation,
@@ -400,6 +401,107 @@ class ClarificationContractTest(unittest.TestCase):
             with self.assertRaises(HypothesisLifecycleError):
                 persist_clarified_proposal(different, output)
 
+    def test_controls_replacement_combined_with_variable_update_is_rejected(self) -> None:
+        # Deterministic contract: replacing controls cannot be combined with
+        # variable-field updates touching a control id (old or replacement)
+        # within one clarification round. The round fails closed instead of
+        # silently preferring one side of the update.
+        payload = _ready_association_payload()
+        payload["controls"] = [
+            {
+                "variable_id": "control_market_volume",
+                "concept_name": "US equity market volume log",
+                "role": "control",
+                "market_context": "United States equity market",
+                "asset_type": "equity_index",
+                "transformation": "log_return",
+                "time_relation": {
+                    "relation": "contemporaneous",
+                    "lag_periods": 0,
+                    "available_before_outcome": True,
+                    "description": "same observation period as the outcome",
+                },
+                "proxy_for": None,
+                "contract_roll_method": None,
+            }
+        ]
+        payload["ambiguities"] = [
+            "The control variable must be reviewed.",
+            "Control timing must be reviewed.",
+        ]
+        payload["ready_for_spec_review"] = False
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        references = proposal_ambiguity_references(proposal)
+        new_control = {
+            "variable_id": "control_vix",
+            "concept_name": "VIX level",
+            "role": "control",
+            "market_context": "United States equity options market",
+            "asset_type": "equity_index",
+            "transformation": "level",
+            "time_relation": {
+                "relation": "contemporaneous",
+                "lag_periods": 0,
+                "available_before_outcome": True,
+                "description": "same observation period as the outcome",
+            },
+            "proxy_for": None,
+            "contract_roll_method": None,
+        }
+        single_answer = parse_clarification_answers(
+            _json_bytes({
+                "proposal_sha256": (
+                    calculate_research_hypothesis_proposal_sha256(proposal)
+                ),
+                "answers": [
+                    {
+                        "ambiguity_id": references[0].ambiguity_id,
+                        "update": {
+                            "controls": [new_control],
+                            "variables": [
+                                {
+                                    "variable_id": "control_market_volume",
+                                    "asset_type": "equity_index",
+                                }
+                            ],
+                        },
+                    }
+                ],
+            })
+        )
+        split_answers = parse_clarification_answers(
+            _json_bytes({
+                "proposal_sha256": (
+                    calculate_research_hypothesis_proposal_sha256(proposal)
+                ),
+                "answers": [
+                    {
+                        "ambiguity_id": references[0].ambiguity_id,
+                        "update": {"controls": [new_control]},
+                    },
+                    {
+                        "ambiguity_id": references[1].ambiguity_id,
+                        "update": {
+                            "variables": [
+                                {
+                                    "variable_id": "control_market_volume",
+                                    "asset_type": "equity_index",
+                                }
+                            ]
+                        },
+                    },
+                ],
+            })
+        )
+        for answers in (single_answer, split_answers):
+            with self.subTest(answers=answers):
+                with self.assertRaises(HypothesisLifecycleError) as raised:
+                    apply_clarification_answers(proposal, answers)
+                self.assertEqual(
+                    raised.exception.failure.code,
+                    HypothesisLifecycleErrorCode.CLARIFICATION_CONFLICT,
+                )
+
 
 class ConfirmationContractTest(unittest.TestCase):
     def test_ready_proposal_can_be_confirmed_and_round_trips(self) -> None:
@@ -644,6 +746,156 @@ class ResearchSpecCompilerTest(unittest.TestCase):
         compile_confirmed_research_spec(proposal, confirmation)
         after = set(ROOT.rglob("*"))
         self.assertEqual(before, after)
+
+    def test_compile_rejects_not_ready_proposal_before_hash_checks(self) -> None:
+        payload = _ready_association_payload()
+        payload["ready_for_spec_review"] = False
+        payload["ambiguities"] = ["The research framing must be reviewed."]
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        # Readiness is checked before confirmation binding in the compiler, so
+        # this structurally valid but non-matching confirmation still reaches
+        # the not-ready failure first.
+        confirmation = ResearchHypothesisProposalConfirmation(
+            proposal_sha256="0" * 64,
+            confirmed=True,
+            confirmed_at=CONFIRMED_AT,
+        )
+        with self.assertRaises(HypothesisLifecycleError) as raised:
+            compile_confirmed_research_spec(proposal, confirmation)
+        failure = raised.exception.failure
+        self.assertEqual(
+            failure.code,
+            HypothesisLifecycleErrorCode.PROPOSAL_NOT_READY,
+        )
+        self.assertEqual(failure.unresolved_requirements, [])
+
+    def test_explicit_default_fields_change_hash_but_keep_semantic_equality(self) -> None:
+        # Compatibility contract: Proposal identity is the current canonical
+        # serialized representation. Whether a default-valued field was
+        # explicitly provided is part of that representation, so explicitly
+        # providing a default and omitting it keep the parsed models
+        # semantically equal yet produce different canonical hashes. This
+        # conservative anti-drift rule is intentional, not accidental; it is
+        # locked here so a future semantic-canonical change needs a deliberate
+        # schema/version and confirmation migration.
+        payload = _ready_association_payload()
+        explicit = parse_research_hypothesis_proposal(_json_bytes(payload))
+        omitted_payload = deepcopy(payload)
+        omitted_payload["research_spec_inputs"]["variables"][0].pop(
+            "revision_policy"
+        )
+        omitted = parse_research_hypothesis_proposal(_json_bytes(omitted_payload))
+        self.assertEqual(explicit, omitted)
+        self.assertNotEqual(
+            calculate_research_hypothesis_proposal_sha256(explicit),
+            calculate_research_hypothesis_proposal_sha256(omitted),
+        )
+        # Canonical bytes are stable for the same parsed model.
+        self.assertEqual(
+            calculate_research_hypothesis_proposal_sha256(explicit),
+            calculate_research_hypothesis_proposal_sha256(
+                parse_research_hypothesis_proposal(
+                    serialize_research_hypothesis_proposal(explicit)
+                )
+            ),
+        )
+
+    def test_follows_outcome_ready_confirmable_but_compile_unresolved(self) -> None:
+        payload = _ready_association_payload()
+        payload["predictors"][0]["time_relation"] = {
+            "relation": "follows_outcome",
+            "lag_periods": 1,
+            "available_before_outcome": False,
+            "description": "known one outcome period after the outcome",
+        }
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        self.assertEqual(proposal.readiness_blockers(), [])
+        self.assertTrue(proposal.ready_for_spec_review)
+        confirmation = confirm_research_hypothesis_proposal(
+            proposal,
+            confirmed_at=CONFIRMED_AT,
+        )
+        with self.assertRaises(HypothesisLifecycleError) as raised:
+            compile_confirmed_research_spec(proposal, confirmation)
+        failure = raised.exception.failure
+        self.assertEqual(
+            failure.code,
+            HypothesisLifecycleErrorCode.RESEARCH_SPEC_UNRESOLVED,
+        )
+        paths = {item.path for item in failure.unresolved_requirements}
+        self.assertIn("usd_index_return.time_relation", paths)
+        # The proposal remains ready and the confirmation stays valid; no spec
+        # bytes or sidecar are produced by the in-memory compile failure.
+        self.assertTrue(proposal.ready_for_spec_review)
+        validate_confirmation_matches_proposal(proposal, confirmation)
+
+    def test_asset_type_conflict_returns_research_spec_invalid(self) -> None:
+        payload = _ready_association_payload()
+        payload["research_spec_inputs"]["variables"][0]["instrument"][
+            "asset_type"
+        ] = "fx"
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        confirmation = confirm_research_hypothesis_proposal(
+            proposal,
+            confirmed_at=CONFIRMED_AT,
+        )
+        with self.assertRaises(HypothesisLifecycleError) as raised:
+            compile_confirmed_research_spec(proposal, confirmation)
+        self.assertEqual(
+            raised.exception.failure.code,
+            HypothesisLifecycleErrorCode.RESEARCH_SPEC_INVALID,
+        )
+
+    def test_same_market_with_cross_market_policies_is_rejected(self) -> None:
+        payload = _ready_association_payload()
+        inputs = payload["research_spec_inputs"]
+        inputs["join_policy"] = "strict_match"
+        inputs["max_staleness_days"] = 0
+        inputs["missing_data_policy"] = "keep_missing"
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        confirmation = confirm_research_hypothesis_proposal(
+            proposal,
+            confirmed_at=CONFIRMED_AT,
+        )
+        with self.assertRaises(HypothesisLifecycleError) as raised:
+            compile_confirmed_research_spec(proposal, confirmation)
+        self.assertEqual(
+            raised.exception.failure.code,
+            HypothesisLifecycleErrorCode.RESEARCH_SPEC_INVALID,
+        )
+
+    def test_cross_market_mapping_without_alignment_is_rejected(self) -> None:
+        payload = _ready_association_payload()
+        predictor_input = payload["research_spec_inputs"]["variables"][1]
+        predictor_input["instrument"]["market"] = "China"
+        predictor_input["instrument"]["timezone"] = "Asia/Shanghai"
+        proposal = parse_research_hypothesis_proposal(_json_bytes(payload))
+        confirmation = confirm_research_hypothesis_proposal(
+            proposal,
+            confirmed_at=CONFIRMED_AT,
+        )
+        with self.assertRaises(HypothesisLifecycleError) as raised:
+            compile_confirmed_research_spec(proposal, confirmation)
+        self.assertEqual(
+            raised.exception.failure.code,
+            HypothesisLifecycleErrorCode.RESEARCH_SPEC_INVALID,
+        )
+
+    def test_inconsistent_compiled_identity_is_rejected(self) -> None:
+        proposal = _ready_association()
+        confirmation = confirm_research_hypothesis_proposal(
+            proposal,
+            confirmed_at=CONFIRMED_AT,
+        )
+        compiled = compile_confirmed_research_spec(proposal, confirmation)
+        with self.assertRaises(ValueError):
+            CompiledResearchSpec(
+                proposal_sha256=compiled.proposal_sha256,
+                confirmation_sha256=compiled.confirmation_sha256,
+                research_spec_sha256="0" * 64,
+                research_spec=compiled.research_spec,
+                provenance=compiled.provenance,
+            )
 
 
 if __name__ == "__main__":

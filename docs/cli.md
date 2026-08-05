@@ -85,6 +85,19 @@ does not select a provider, download data, compile a workflow, or execute
 statistics. Missing mandatory mappings return machine-readable
 `unresolved_requirements` and write no spec.
 
+`ready_for_spec_review=true` is a Proposal-layer statement: the Proposal is
+reviewable and confirmable, but compilation may still return
+`unresolved_requirements` when existing ResearchSpec mappings are absent or
+inexpressible — for example a `follows_outcome` relation that cannot be
+represented as a non-negative lag. Such relations are rejected, never guessed
+or converted. Re-running `confirm-proposal` for the same proposal writes a new
+audit timestamp and therefore conflicts with an existing immutable
+confirmation file instead of overwriting it. Proposal hash identity includes
+whether default-valued fields were explicitly provided; explicitly adding or
+removing such fields changes the hash and invalidates an older confirmation.
+A confirmation is a consistency binding and audit record, not identity
+authentication.
+
 The only hypothesis command that may call a model is explicit and create-only:
 
 ```powershell

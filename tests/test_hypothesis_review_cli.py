@@ -317,6 +317,62 @@ class HypothesisReviewCliTest(unittest.TestCase):
         )
         self.assertNotIn("Traceback", stderr)
 
+    def test_cli_compile_reports_confirmation_mismatch_without_writing_spec(self) -> None:
+        with tempfile.TemporaryDirectory(dir=ROOT) as directory:
+            proposal_path = Path(directory) / "proposal.json"
+            confirmation_path = Path(directory) / "confirmation.json"
+            spec_path = Path(directory) / "research-spec.json"
+            _write_ready_proposal(proposal_path)
+            self.assertEqual(
+                _invoke(
+                    [
+                        "hypothesis",
+                        "confirm-proposal",
+                        "--proposal",
+                        str(proposal_path),
+                        "--output",
+                        str(confirmation_path),
+                    ]
+                )[0],
+                0,
+            )
+            proposal = parse_research_hypothesis_proposal(
+                proposal_path.read_bytes()
+            )
+            changed_payload = proposal.model_dump(mode="json")
+            changed_payload["sample"]["end_date"] = "2025-12-31"
+            proposal_path.write_bytes(
+                serialize_research_hypothesis_proposal(
+                    parse_research_hypothesis_proposal(
+                        json.dumps(changed_payload).encode("utf-8")
+                    )
+                )
+            )
+            exit_code, stdout, stderr = _invoke(
+                [
+                    "hypothesis",
+                    "compile-research-spec",
+                    "--proposal",
+                    str(proposal_path),
+                    "--confirmation",
+                    str(confirmation_path),
+                    "--output",
+                    str(spec_path),
+                ]
+            )
+            self.assertEqual(
+                exit_code,
+                int(WorkflowCliExitCode.HYPOTHESIS_CONFIRMATION_MISMATCH),
+            )
+            self.assertEqual(stdout, "")
+            self.assertEqual(
+                json.loads(stderr)["error"]["code"],
+                "hypothesis_confirmation_mismatch",
+            )
+            self.assertFalse(spec_path.exists())
+            self.assertFalse(Path(str(spec_path) + ".provenance.json").exists())
+            self.assertNotIn("Traceback", stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

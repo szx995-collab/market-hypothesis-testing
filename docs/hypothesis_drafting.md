@@ -88,6 +88,15 @@ required review item forces `ready_for_spec_review=false`. This is still a
 valid proposal: “valid” means safe and structurally honest, not complete or
 confirmed.
 
+`ready_for_spec_review=true` is a Proposal-layer statement: the Proposal is
+complete enough for user review and explicit confirmation. It does not
+guarantee that every mandatory ResearchSpec mapping already exists, and
+confirmation does not make generation mandatory — compilation can still return
+structured `unresolved_requirements`. A relation such as `follows_outcome`
+cannot be losslessly represented as a non-negative lag in the existing
+ResearchSpec, so it is rejected at compilation rather than reinterpreted,
+guessed, or silently converted.
+
 ## Structured clarification
 
 Each current ambiguity receives a deterministic ID derived from its position
@@ -112,6 +121,17 @@ blockers cannot be confirmed. Changing any effective proposal field changes the
 canonical hash and invalidates the old confirmation. A confirmation record is
 not a digital signature and grants no data, network, workflow, or execution
 authority.
+
+Proposal identity is the current canonical serialized representation. Whether
+a default-valued field was explicitly provided is part of that representation:
+explicitly providing a default and omitting it can produce different canonical
+hashes for semantically equal models. This is a conservative anti-drift rule,
+not a semantic-equivalence hash; a future switch to semantic canonicalization
+requires its own schema/version and confirmation migration design. Because
+every confirmation records a fresh timezone-aware audit time, re-confirming
+the same proposal writes a different record and conflicts with an existing
+immutable confirmation file instead of silently overwriting it. A confirmation
+is a consistency binding and audit record, not identity authentication.
 
 The compiler maps only confirmed values into the existing `ResearchSpec`:
 claim type, roles, transformations, non-negative lags, sample, alignment,

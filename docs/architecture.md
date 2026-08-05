@@ -18,6 +18,8 @@ LLM 只选择可审阅的结构和 `target_parameter`/`direction`。Python 根�
 
 澄清只能修改白名单字段，并在每次应用后重新执行完整 Proposal 验证。Ready 不等于 Confirmed；Confirmed 不等于已执行。只有匹配规范化 Proposal SHA-256 的显式确认才能进入 ResearchSpec 编译。编译器只映射已确认且能明确映射的字段；若缺少 instrument/field、样本、对齐、复权/修订、多重检验、稳健性或限制等现有 ResearchSpec 必填项，则返回结构化 unresolved requirements，不使用虚构默认值。
 
+`ready_for_spec_review=true` 只表示 Proposal 层已完成验证、可供用户审查和显式确认，不保证所有 ResearchSpec 必填映射已存在；编译仍可能返回 unresolved requirements。`follows_outcome` 等无法无损映射为现有 ResearchSpec 非负 lag 的时间关系会在编译期被拒绝，不会被反向解释、猜测或静默转换。Proposal 身份基于当前 canonical serialized representation：默认值字段是否被显式提供属于该表示的一部分，显式提供默认值与省略可能产生不同 hash；这是保守的防漂移规则，不是纯语义等价哈希。未来若改为纯语义 canonical，需要单独设计 schema/version 和确认迁移策略。确认记录是绑定一致性记录，不是数字签名或身份认证；同一 Proposal 再次确认会写入新的审计时间，与既有不可变确认文件发生输出冲突时不会静默覆盖。
+
 ResearchSpec 编译是纯 Python 操作，不调用 LLM、网络、数据源或 shell。输出必须通过现有 ResearchSpec 验证与 canonical serialization，并使用 sidecar 保存 Proposal hash、confirmation hash 和审计时间。确认或生成 ResearchSpec 不会下载数据、编译 workflow 或执行统计。
 
 ## ResearchSpec 领域边界

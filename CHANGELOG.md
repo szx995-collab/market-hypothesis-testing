@@ -12,12 +12,14 @@
 - 稳定 ambiguity ID、严格 `ClarificationAnswers`、白名单确定性应用及完整 Proposal 再验证。
 - 绑定规范化 Proposal SHA-256 的显式确认记录，以及只映射已确认字段的确定性 ResearchSpec 编译器。
 - ResearchSpec canonical serialization、确认 provenance sidecar 和离线澄清/确认/编译 CLI。
+- 锁定契约测试：Ready 不等于必然可编译（`follows_outcome` 等关系在编译期返回 unresolved 而非猜测）、Proposal hash 对字段显式性敏感、asset type/对齐冲突分支、controls 组合冲突确定性拒绝。
 
 ### Security
 
 - 拒绝重复 JSON key、非标准浮点、Markdown 包裹、未知字段、路径/命令/凭据/供应商身份/Bundle 身份进入生成字段，并在模型调用前检查 Key、网络授权和输出冲突。
 - DeepSeek 假设草案与固定 WTI plan provider 复用同一套官方 HTTPS 主机、超时、响应大小和清洗传输边界。
 - 澄清、确认和 ResearchSpec 输出拒绝重复 JSON key、非有限数、未知字段、符号链接、静默覆盖与哈希不匹配；缺少必填映射时不创建伪造 ResearchSpec。
+- 文档明确：确认是绑定一致性记录而非数字签名或身份认证；重复确认因新审计时间与不可变确认文件冲突时不会静默覆盖；Proposal 身份基于当前 canonical 表示，显式默认值与省略可能产生不同 hash。
 
 ## [0.1.0] - 2026-08-05
 
