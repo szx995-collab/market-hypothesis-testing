@@ -441,6 +441,26 @@ class AcquisitionRequestPreSampleTest(unittest.TestCase):
             resolution.resolved_acquisition_start, date(2020, 1, 1)
         )
 
+    def test_calendar_adapter_failure_is_unresolved(self) -> None:
+        calendars, instruments = _load_registries()
+        requirement = _pre_sample_requirement()
+        adapted_calendars = _calendars_with_adapter(calendars, "test-sessions")
+
+        def failing_adapter(start: date, periods: int) -> date:
+            raise ValueError("adapter failure")
+
+        resolution = resolve_pre_sample_requirement(
+            requirement,
+            adapted_calendars,
+            _synthetic_snapshot(),
+            session_adapters={"test-sessions": failing_adapter},
+        )
+        self.assertEqual(resolution.status, PreSampleStatus.UNRESOLVED)
+        self.assertIsNone(resolution.resolved_acquisition_start)
+        self.assertTrue(
+            any("failed to compute" in evidence for evidence in resolution.evidence)
+        )
+
     def test_calendar_adapter_declared_but_unavailable_is_unresolved(self) -> None:
         calendars, instruments = _load_registries()
         entry = instruments.entries[0]

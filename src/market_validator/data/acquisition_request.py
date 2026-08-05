@@ -540,9 +540,9 @@ _WINDOWS_DRIVE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]")
 def _is_absolute_path_identity(value: str) -> bool:
     if value.startswith("file://"):
         return True
-    if _WINDOWS_DRIVE_PATH_RE.match(value):
-        return True
     path = Path(value)
+    if _WINDOWS_DRIVE_PATH_RE.match(value):
+        return ".." not in path.parts
     return path.is_absolute() and ".." not in path.parts
 
 
