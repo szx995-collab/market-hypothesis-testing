@@ -27,6 +27,7 @@
 
 - 完善包元数据、源码发行清单、`.gitignore` 和发布文档。
 - 为 Windows 声明 IANA 时区数据库条件依赖，确保全新安装后的 `zoneinfo` 验证可用。
+- 排除测试生成的 `.runtime_*` 目录，并在分发包验收时拒绝此类运行时产物。
 
 [Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/szx995-collab/market-hypothesis-testing/releases/tag/v0.1.0
