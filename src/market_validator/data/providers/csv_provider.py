@@ -299,6 +299,45 @@ class CSVProvider:
             quality=quality,
         )
 
+    def parse_content(
+        self,
+        content: bytes,
+        requirement: DataRequirement,
+        path: Path,
+        content_sha256: str,
+    ) -> DataBundle:
+        """Parse already-captured bytes into a DataBundle without re-reading."""
+        rows_read, parsed_rows, issues = self._parse_rows(content)
+        observations, quality = build_quality_report(
+            rows_read=rows_read,
+            observation_rows=parsed_rows,
+            initial_issues=issues,
+            requirement=requirement,
+        )
+        try:
+            source_uri = path.as_uri()
+        except ValueError as error:
+            raise CSVProviderError(
+                f"could not identify local CSV file: {error}"
+            ) from error
+        source = DataSourceMetadata(
+            provider_id=self.provider_id,
+            dataset_id=path.name,
+            provider_symbol=path.name,
+            source_uri=source_uri,
+            retrieved_at=datetime.now(timezone.utc),
+            public_request_parameters={"source_kind": "local_file"},
+            content_sha256=content_sha256,
+            license_note="User-supplied local file; license terms are not asserted.",
+            is_fallback=False,
+        )
+        return DataBundle(
+            requirement=requirement,
+            observations=observations,
+            source=source,
+            quality=quality,
+        )
+
     def fetch(self, requirement: DataRequirement) -> DataBundle:
         raw_bytes, source = self._read_source()
         rows_read, parsed_rows, issues = self._parse_rows(raw_bytes)

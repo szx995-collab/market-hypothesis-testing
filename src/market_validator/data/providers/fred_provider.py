@@ -67,6 +67,7 @@ FRED_OBSERVATIONS_SOURCE_URI = (
     "https://api.stlouisfed.org/fred/series/observations"
 )
 FRED_PAGE_LIMIT = 100_000
+MAX_PAGINATION_PAGES = 200
 FRED_EARLIEST_REALTIME_DATE = "1776-07-04"
 FRED_LATEST_REALTIME_DATE = "9999-12-31"
 FRED_CREDENTIAL_SPEC = CredentialSpec(
@@ -317,6 +318,180 @@ class FredProvider:
             )
         return parameters
 
+    def render_public_steps(
+        self, requirement: DataRequirement, series_id: str
+    ) -> list[dict[str, object]]:
+        """Render the exact public steps the FRED contract requires.
+
+        Step 1 is the /fred/series metadata call and step 2 is the paginated
+        /fred/series/observations call. The HTTP parameters never include
+        synthetic fields such as revision_policy or requirement ids.
+        """
+        from market_validator.data.acquisition_request import (
+            PaginationPolicy,
+            RequestMethod,
+        )
+
+        observation_parameters = self._public_observation_parameters(
+            requirement, series_id
+        )
+        observation_parameters["limit"] = str(FRED_PAGE_LIMIT)
+        observation_parameters = {
+            key: (str(value) if isinstance(value, (int, float)) else value)
+            for key, value in observation_parameters.items()
+        }
+        return [
+            {
+                "sequence": 1,
+                "method": RequestMethod.GET,
+                "endpoint": FRED_SERIES_PATH,
+                "public_parameters": {
+                    "series_id": series_id,
+                    "file_type": "json",
+                },
+                "pagination_policy": PaginationPolicy.NONE,
+            },
+            {
+                "sequence": 2,
+                "method": RequestMethod.GET,
+                "endpoint": FRED_OBSERVATIONS_PATH,
+                "public_parameters": observation_parameters,
+                "pagination_policy": PaginationPolicy.FRED_COUNT_OFFSET_V1,
+            },
+        ]
+
+    def resolve_credential_noninteractive(self) -> SecretStr | None:
+        """Resolve FRED credential non-interactively, or return None."""
+        from market_validator.credentials.resolver import CredentialMissingError
+
+        if self._credential_resolver is None:
+            return None
+        try:
+            resolved = self._credential_resolver.resolve(
+                FRED_CREDENTIAL_SPEC, interactive=False
+            )
+        except CredentialMissingError:
+            return None
+        return resolved.secret
+
+    def execute_capture(
+        self,
+        requirement: DataRequirement,
+        request: object,
+    ) -> object:
+        """Execute the authorized FRED steps and return an in-memory capture.
+
+        This path never calls legacy FredStorage and never commits files; the
+        Phase 3 coordinator commits the whole snapshot transactionally.
+        """
+        from market_validator.data.execution import (
+            ProviderExecutionCapture,
+            RawArtifact,
+            RequestTraceEntry,
+        )
+
+        credential = self.resolve_credential_noninteractive()
+        if credential is None:
+            raise FredConfigurationError(
+                "FRED credential is required for live access"
+            )
+        _, mapping = self._resolve_mapping(requirement)
+        self._validate_capabilities(requirement)
+        transport = self._get_transport(credential, retries=0)
+        steps = list(request.steps)
+        trace: list[RequestTraceEntry] = []
+        raw_pages: list[bytes] = []
+
+        series_step = steps[0]
+        series_response = transport.get_json(
+            series_step.endpoint,
+            {k: v for k, v in series_step.public_parameters.items()},
+        )
+        self._validate_series_metadata(
+            series_response, requirement, mapping.provider_symbol
+        )
+        trace.append(
+            RequestTraceEntry(
+                sequence=series_step.sequence,
+                endpoint=series_step.endpoint,
+                public_parameters=dict(series_step.public_parameters),
+                response_sha256=hashlib.sha256(
+                    series_response.raw_body
+                ).hexdigest(),
+                response_byte_size=len(series_response.raw_body),
+            )
+        )
+        raw_pages.append(series_response.raw_body)
+
+        observations_step = steps[1]
+        base_parameters = {
+            k: (str(v) if isinstance(v, (int, float)) else v)
+            for k, v in observations_step.public_parameters.items()
+        }
+        started = datetime.now(timezone.utc)
+        raw_observation_pages, records = self._fetch_observation_pages(
+            transport, base_parameters, trace=trace
+        )
+        raw_pages.extend(raw_observation_pages)
+        clock_value = self._clock()
+        if clock_value.tzinfo is None or clock_value.utcoffset() is None:
+            raise FredDataValidationError(
+                "FRED retrieval clock must be timezone-aware"
+            )
+        retrieved_at = clock_value.astimezone(timezone.utc)
+        observations, quality = self._normalize_observations(
+            records, requirement, retrieved_at
+        )
+        combined_sha256 = self._combined_sha256(raw_observation_pages)
+        source = DataSourceMetadata(
+            provider_id=self.provider_id,
+            dataset_id=mapping.provider_symbol,
+            provider_symbol=mapping.provider_symbol,
+            source_uri=FRED_OBSERVATIONS_SOURCE_URI,
+            retrieved_at=retrieved_at,
+            public_request_parameters={
+                **series_step.public_parameters,
+                **observations_step.public_parameters,
+                "observation_page_count": len(raw_observation_pages),
+            },
+            content_sha256=combined_sha256,
+            license_note=(
+                "FRED official series; review FRED and series-specific notes "
+                "for terms and attribution."
+            ),
+            is_fallback=False,
+        )
+        bundle = DataBundle(
+            requirement=requirement,
+            observations=observations,
+            source=source,
+            quality=quality,
+        )
+        completed = datetime.now(timezone.utc)
+        return ProviderExecutionCapture(
+            requirement_id=requirement.requirement_id,
+            provider_id=self.provider_id,
+            started_at=started,
+            completed_at=completed,
+            request_trace=trace,
+            raw_artifacts=[
+                RawArtifact(
+                    logical_name="series.json",
+                    media_type="application/json",
+                    content=raw_pages[0],
+                ),
+                *[
+                    RawArtifact(
+                        logical_name=f"observations-page-{index}.json",
+                        media_type="application/json",
+                        content=page,
+                    )
+                    for index, page in enumerate(raw_observation_pages)
+                ],
+            ],
+            bundle=bundle,
+        )
+
     def dry_run(self, requirement: DataRequirement) -> dict[str, object]:
         _, mapping = self._resolve_mapping(requirement)
         self._validate_capabilities(requirement)
@@ -333,12 +508,14 @@ class FredProvider:
             "public_parameters": parameters,
         }
 
-    def _get_transport(self, api_key: SecretStr) -> FredTransport:
+    def _get_transport(
+        self, api_key: SecretStr, *, retries: int = 2
+    ) -> FredTransport:
         if self._transport is not None:
             return self._transport
         if self._transport_factory is not None:
             return self._transport_factory(api_key)
-        return FredHttpsTransport(api_key)
+        return FredHttpsTransport(api_key, retries=retries)
 
     def _validate_series_metadata(
         self,
@@ -387,6 +564,7 @@ class FredProvider:
         self,
         transport: FredTransport,
         base_parameters: dict[str, str | int],
+        trace: list[object] | None = None,
     ) -> tuple[list[bytes], list[dict[str, Any]]]:
         raw_pages: list[bytes] = []
         observations: list[dict[str, Any]] = []
@@ -394,10 +572,33 @@ class FredProvider:
         expected_count: int | None = None
 
         while True:
+            if len(raw_pages) >= MAX_PAGINATION_PAGES:
+                raise FredResponseFormatError(
+                    "FRED pagination exceeded the safe page limit"
+                )
             parameters = dict(base_parameters)
             parameters["offset"] = requested_offset
             response = transport.get_json(FRED_OBSERVATIONS_PATH, parameters)
             payload = response.payload
+            if trace is not None:
+                from market_validator.data.execution import (
+                    RequestTraceEntry,
+                )
+
+                trace.append(
+                    RequestTraceEntry(
+                        sequence=2,
+                        endpoint=FRED_OBSERVATIONS_PATH,
+                        public_parameters={
+                            key: str(value)
+                            for key, value in parameters.items()
+                        },
+                        response_sha256=hashlib.sha256(
+                            response.raw_body
+                        ).hexdigest(),
+                        response_byte_size=len(response.raw_body),
+                    )
+                )
             for field in ("count", "offset", "limit", "observations"):
                 if field not in payload:
                     raise FredResponseFormatError(

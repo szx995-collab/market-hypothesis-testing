@@ -128,12 +128,27 @@ def _synthetic_snapshot(provider_id: str = "synthetic_provider") -> ProviderCapa
 
 
 def _synthetic_templates() -> dict[str, object]:
-    def template(requirement: DataPlan, symbol: str) -> dict[str, str]:
-        return {
-            "series_id": symbol,
-            "observation_start": requirement.start_date.isoformat(),
-            "observation_end": requirement.end_date.isoformat(),
-        }
+    from market_validator.data.acquisition_request import (
+        PaginationPolicy,
+        PublicRequestStep,
+        RequestMethod,
+    )
+
+    def template(requirement: DataPlan, symbol: str):
+        return [
+            PublicRequestStep(
+                step_id="synthetic-observations",
+                sequence=1,
+                method=RequestMethod.GET,
+                endpoint="/synthetic/series",
+                public_parameters={
+                    "series_id": symbol,
+                    "observation_start": requirement.start_date.isoformat(),
+                    "observation_end": requirement.end_date.isoformat(),
+                },
+                pagination_policy=PaginationPolicy.NONE,
+            )
+        ]
 
     return {"synthetic_provider": template}
 
@@ -666,9 +681,9 @@ class AcquisitionRequestStrictJsonTest(unittest.TestCase):
             separators=(",", ":"),
         )
         raw = raw.replace(
-            '"acquisition_request_schema_version":"1.0"',
-            '"acquisition_request_schema_version":"1.0",'
-            '"acquisition_request_schema_version":"1.0"',
+            '"acquisition_request_schema_version":"1.1"',
+            '"acquisition_request_schema_version":"1.1",'
+            '"acquisition_request_schema_version":"1.1"',
             1,
         )
         with self.assertRaises(AcquisitionRequestReviewError):
@@ -691,7 +706,7 @@ class AcquisitionRequestStrictJsonTest(unittest.TestCase):
             separators=(",", ":"),
         )
         injected = raw.replace(
-            '"acquisition_request_schema_version":"1.0"',
+            '"acquisition_request_schema_version":"1.1"',
             '"acquisition_request_schema_version":NaN',
             1,
         )

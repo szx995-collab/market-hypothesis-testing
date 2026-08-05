@@ -75,6 +75,7 @@ class FredHttpsTransport:
         timeout_seconds: float = 15.0,
         opener: object | None = None,
         sleep: Callable[[float], None] = time.sleep,
+        retries: int = MAX_RETRIES,
     ) -> None:
         if not isinstance(api_key, SecretStr):
             raise TypeError("FRED transport requires a protected credential")
@@ -84,6 +85,7 @@ class FredHttpsTransport:
         self._timeout_seconds = timeout_seconds
         self._opener = opener or build_opener(_RejectRedirectHandler())
         self._sleep = sleep
+        self._retries = max(0, min(int(retries), MAX_RETRIES))
 
     def get_json(
         self, path: str, public_parameters: Mapping[str, str | int]
@@ -121,7 +123,7 @@ class FredHttpsTransport:
             },
         )
 
-        for attempt in range(MAX_RETRIES + 1):
+        for attempt in range(self._retries + 1):
             try:
                 response = self._opener.open(request, timeout=self._timeout_seconds)
                 try:
@@ -134,7 +136,7 @@ class FredHttpsTransport:
                         "FRED response exceeded the safe size limit"
                     )
                 if not 200 <= status_code < 300:
-                    if status_code in RETRYABLE_STATUS_CODES and attempt < MAX_RETRIES:
+                    if status_code in RETRYABLE_STATUS_CODES and attempt < self._retries:
                         self._sleep(0.25 * (attempt + 1))
                         continue
                     raise classify_fred_http_error(
@@ -146,7 +148,7 @@ class FredHttpsTransport:
                     )
             except HTTPError as error:
                 status_code = int(error.code)
-                if status_code in RETRYABLE_STATUS_CODES and attempt < MAX_RETRIES:
+                if status_code in RETRYABLE_STATUS_CODES and attempt < self._retries:
                     error.close()
                     self._sleep(0.25 * (attempt + 1))
                     continue
