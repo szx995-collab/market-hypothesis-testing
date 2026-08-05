@@ -238,17 +238,41 @@ _FORBIDDEN_GENERATED_TEXT = re.compile(
     flags=re.IGNORECASE | re.MULTILINE,
 )
 
+_ORDER_EXECUTION_VERB = (
+    r"(?:place|places|placed|placing|submit|submits|submitted|submitting|"
+    r"send|sends|sent|sending|execute|executes|executed|executing|"
+    r"route|routes|routed|routing|cancel|cancels|canceled|cancelled|"
+    r"canceling|cancelling)"
+)
+_POSITION_EXECUTION_VERB = (
+    r"(?:open|opens|opened|opening|close|closes|closed|closing|"
+    r"enter|enters|entered|entering|exit|exits|exited|exiting|"
+    r"liquidate|liquidates|liquidated|liquidating)"
+)
+_AUTOMATION_EXECUTION_VERB = (
+    r"(?:run|runs|running|start|starts|started|starting|"
+    r"enable|enables|enabled|enabling|deploy|deploys|deployed|deploying|"
+    r"operate|operates|operated|operating|design|designs|designed|designing|"
+    r"build|builds|built|building)"
+)
+_CONTINUOUS_TRADING_VERB = (
+    r"(?:start|starts|started|starting|begin|begins|began|begun|beginning|"
+    r"keep|keeps|kept|keeping|stop|stops|stopped|stopping)"
+)
 _TRADING_INTENT_ENGLISH = tuple(
     re.compile(pattern, flags=re.IGNORECASE)
     for pattern in (
         r"\b(?:trading|trade)\s+strateg(?:y|ies)\b",
         r"\btrading\s+profit(?:s|ability)?\b",
-        r"\b(?:automatic|automated|auto)\s*-?\s*trad(?:e|ing)\b",
-        r"\b(?:place|submit|send|execute)\s+(?:an?\s+|the\s+|this\s+)?orders?\b",
-        r"\b(?:open|close)\s+(?:an?\s+|the\s+|this\s+)?positions?\b",
-        r"\b(?:please|should|can|could|would|when)\s+(?:i\s+|we\s+|the\s+(?:system|agent|model)\s+)?(?:buy|sell|trade|execute)\b",
-        r"^\s*(?:please\s+)?(?:buy|sell|execute|trade(?!\s+(?:policy|volume|flows?|balance|data|statistics)\b))\b",
-        r"\b(?:buy|sell|trading)\s+(?:signals?|orders?|strateg(?:y|ies)|positions?)\b",
+        r"\b(?:i|we)\s+(?:want|need|plan|intend|would\s+like)\s+to\s+(?:buy|sell|trade)\b",
+        r"\b(?:help|tell|show|advise|instruct)\s+(?:me|us)\s+(?:(?:when|how|whether)\s+)?(?:to\s+)?(?:buy|sell|trade)\b",
+        r"\b(?:please|should|can|could|would|will|may)\s+(?:i\s+|we\s+|you\s+|the\s+(?:system|agent|model)\s+)?(?:buy|sell|trade)\b",
+        rf"\b{_ORDER_EXECUTION_VERB}\s+(?:an?\s+|the\s+|this\s+|that\s+|my\s+|our\s+)?(?:buy\s+|sell\s+|market\s+|limit\s+|stop\s+)?(?:orders?|trades?)\b",
+        rf"\b{_POSITION_EXECUTION_VERB}\s+(?:an?\s+|the\s+|this\s+|that\s+|my\s+|our\s+)?(?:long\s+|short\s+)?positions?\b",
+        rf"\b{_AUTOMATION_EXECUTION_VERB}\s+(?:an?\s+)?(?:live|real[- ]?money|automatic|automated|algorithmic|auto)\s*-?\s*trading\b",
+        r"\b(?:automate|automates|automated|automating)\s+(?:my\s+|our\s+|the\s+)?trading\b",
+        rf"\b{_CONTINUOUS_TRADING_VERB}\s+(?:buying|selling|trading)\b",
+        r"^\s*(?:please\s+)?(?:buy|sell|trade(?!\s+(?:policy|volume|flows?|balance|data|statistics)\b))\b",
     )
 )
 _TRADING_INTENT_CHINESE = (
