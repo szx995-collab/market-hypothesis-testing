@@ -7,7 +7,6 @@ import json
 import math
 import os
 from typing import NoReturn
-from urllib.request import urlopen
 
 from market_validator.deepseek_transport import (
     DEFAULT_DEEPSEEK_BASE_URL,
@@ -17,6 +16,7 @@ from market_validator.deepseek_transport import (
     DeepSeekTransportError,
     DeepSeekTransportTimeout,
     UrllibDeepSeekTransport,
+    _urlopen_without_redirects,
     validated_deepseek_endpoint,
 )
 from market_validator.plan_providers.base import (
@@ -44,6 +44,12 @@ class UrllibDeepSeekPlanTransport(UrllibDeepSeekTransport):
             opener=lambda *args, **kwargs: urlopen(*args, **kwargs),
             response_limit=lambda: MAX_RESPONSE_BYTES,
         )
+
+
+def urlopen(*args: object, **kwargs: object) -> object:
+    """Compatibility injection point that still enforces no redirects."""
+
+    return _urlopen_without_redirects(*args, **kwargs)
 
 
 def _fail(

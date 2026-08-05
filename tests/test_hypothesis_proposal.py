@@ -122,6 +122,52 @@ def _bytes(payload: dict[str, object]) -> bytes:
     ).encode("utf-8")
 
 
+def _predictive_payload() -> dict[str, object]:
+    payload = _association_payload()
+    payload["original_question"] = (
+        "Do prior USD index returns predict later US equity-market returns?"
+    )
+    payload["normalized_research_question"] = payload["original_question"]
+    payload["claim_type"] = "predictive"
+    payload["predictors"][0]["time_relation"] = {
+        "relation": "precedes_outcome",
+        "lag_periods": 1,
+        "available_before_outcome": True,
+        "description": "known one outcome period before the outcome",
+    }
+    statistical = payload["statistical_hypothesis"]
+    statistical["statistical_method"] = "lead_lag_regression"
+    statistical["target_parameter"]["kind"] = "regression_coefficient"
+    statistical["null_hypothesis"] = "H0: beta = 0"
+    statistical["alternative_hypothesis"] = "H1: beta != 0"
+    return payload
+
+
+def _additional_input(
+    *,
+    variable_id: str,
+    role: str,
+    relation: str,
+    available_before_outcome: bool | None,
+) -> dict[str, object]:
+    return {
+        "variable_id": variable_id,
+        "concept_name": f"{variable_id} conceptual input",
+        "role": role,
+        "market_context": "United States market",
+        "asset_type": "equity_index",
+        "transformation": "log_return",
+        "time_relation": {
+            "relation": relation,
+            "lag_periods": 1 if relation in {"precedes_outcome", "follows_outcome"} else None,
+            "available_before_outcome": available_before_outcome,
+            "description": f"{variable_id} timing relative to the outcome",
+        },
+        "proxy_for": None,
+        "contract_roll_method": None,
+    }
+
+
 class ResearchHypothesisProposalTest(unittest.TestCase):
     def test_chinese_predictive_example_is_valid_but_explicitly_ambiguous(self) -> None:
         proposal = parse_research_hypothesis_proposal(OIL_EXAMPLE.read_bytes())
@@ -262,6 +308,129 @@ class ResearchHypothesisProposalTest(unittest.TestCase):
         payload["ambiguities"] = []
         with self.assertRaises(HypothesisProposalError):
             parse_research_hypothesis_proposal(_bytes(payload))
+
+    def test_non_target_predictor_after_outcome_blocks_ready(self) -> None:
+        payload = _predictive_payload()
+        payload["predictors"].append(
+            _additional_input(
+                variable_id="future_predictor",
+                role="predictor",
+                relation="follows_outcome",
+                available_before_outcome=False,
+            )
+        )
+        with self.assertRaises(HypothesisProposalError):
+            parse_research_hypothesis_proposal(_bytes(payload))
+
+    def test_control_after_outcome_blocks_ready(self) -> None:
+        payload = _predictive_payload()
+        payload["controls"] = [
+            _additional_input(
+                variable_id="future_control",
+                role="control",
+                relation="follows_outcome",
+                available_before_outcome=False,
+            )
+        ]
+        with self.assertRaises(HypothesisProposalError):
+            parse_research_hypothesis_proposal(_bytes(payload))
+
+    def test_predictive_unknown_control_timing_requires_ambiguity(self) -> None:
+        payload = _predictive_payload()
+        payload["controls"] = [
+            _additional_input(
+                variable_id="unknown_control",
+                role="control",
+                relation="unspecified",
+                available_before_outcome=None,
+            )
+        ]
+        with self.assertRaises(HypothesisProposalError):
+            parse_research_hypothesis_proposal(_bytes(payload))
+        payload["ready_for_spec_review"] = False
+        payload["ambiguities"] = [
+            "Whether unknown_control is available before the outcome is unresolved."
+        ]
+        parsed = parse_research_hypothesis_proposal(_bytes(payload))
+        self.assertFalse(parsed.ready_for_spec_review)
+
+    def test_predictive_any_input_with_unclear_availability_blocks_ready(self) -> None:
+        payload = _predictive_payload()
+        payload["predictors"].append(
+            _additional_input(
+                variable_id="unclear_predictor",
+                role="predictor",
+                relation="precedes_outcome",
+                available_before_outcome=None,
+            )
+        )
+        with self.assertRaises(HypothesisProposalError):
+            parse_research_hypothesis_proposal(_bytes(payload))
+
+    def test_association_unspecified_timing_blocks_ready(self) -> None:
+        payload = _association_payload()
+        payload["predictors"][0]["time_relation"] = {
+            "relation": "unspecified",
+            "lag_periods": None,
+            "available_before_outcome": None,
+            "description": "timing has not been selected",
+        }
+        with self.assertRaises(HypothesisProposalError):
+            parse_research_hypothesis_proposal(_bytes(payload))
+
+    def test_explicit_contemporaneous_association_remains_ready(self) -> None:
+        parsed = parse_research_hypothesis_proposal(_bytes(_association_payload()))
+        self.assertEqual(
+            parsed.predictors[0].time_relation.relation.value,
+            "contemporaneous",
+        )
+        self.assertTrue(parsed.ready_for_spec_review)
+
+    def test_trading_intent_requires_explicit_unsupported_request(self) -> None:
+        questions = (
+            "Design a trading strategy.",
+            "Please place orders.",
+            "Should I buy oil?",
+            "Please sell this position.",
+            "Open a position in oil futures.",
+            "Close the position now.",
+            "Can I trade oil futures?",
+            "Execute an order.",
+            "请交易这只股票。",
+            "请下单。",
+            "何时买入或卖出？",
+            "请开仓并在稍后平仓。",
+            "如何管理持仓？",
+            "用于实盘。",
+            "设计自动交易系统。",
+            "请设计交易策略。",
+        )
+        for question in questions:
+            payload = _association_payload()
+            payload["original_question"] = question
+            payload["ready_for_spec_review"] = False
+            with self.subTest(question=question):
+                with self.assertRaises(HypothesisProposalError):
+                    parse_research_hypothesis_proposal(_bytes(payload))
+                payload["unsupported_requests"] = [
+                    "Trading and order execution are unsupported."
+                ]
+                parsed = parse_research_hypothesis_proposal(_bytes(payload))
+                self.assertIn("Trading", parsed.unsupported_requests[0])
+                self.assertFalse(parsed.ready_for_spec_review)
+
+    def test_non_trading_research_terms_are_not_false_positives(self) -> None:
+        questions = (
+            "Is international trade volume associated with oil prices?",
+            "股票交易日收益率是否与美元指数同期相关？",
+        )
+        for question in questions:
+            payload = _association_payload()
+            payload["original_question"] = question
+            with self.subTest(question=question):
+                parsed = parse_research_hypothesis_proposal(_bytes(payload))
+                self.assertEqual(parsed.unsupported_requests, [])
+                self.assertTrue(parsed.ready_for_spec_review)
 
     def test_prompt_injection_is_preserved_only_as_original_question(self) -> None:
         payload = _association_payload()

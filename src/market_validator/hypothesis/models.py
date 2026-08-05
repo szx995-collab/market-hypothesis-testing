@@ -44,6 +44,7 @@ class DraftTimeRelation(StrEnum):
     OUTCOME_PERIOD = "outcome_period"
     CONTEMPORANEOUS = "contemporaneous"
     PRECEDES_OUTCOME = "precedes_outcome"
+    FOLLOWS_OUTCOME = "follows_outcome"
     UNSPECIFIED = "unspecified"
 
 
@@ -84,6 +85,13 @@ class HypothesisTimeRelationDraft(StrictResearchModel):
         ):
             raise ValueError(
                 "precedes_outcome cannot state that the variable is unavailable"
+            )
+        if (
+            self.relation is DraftTimeRelation.FOLLOWS_OUTCOME
+            and self.available_before_outcome is True
+        ):
+            raise ValueError(
+                "follows_outcome cannot state that the variable is available before outcome"
             )
         return self
 
@@ -230,6 +238,53 @@ _FORBIDDEN_GENERATED_TEXT = re.compile(
     flags=re.IGNORECASE | re.MULTILINE,
 )
 
+_TRADING_INTENT_ENGLISH = tuple(
+    re.compile(pattern, flags=re.IGNORECASE)
+    for pattern in (
+        r"\b(?:trading|trade)\s+strateg(?:y|ies)\b",
+        r"\btrading\s+profit(?:s|ability)?\b",
+        r"\b(?:automatic|automated|auto)\s*-?\s*trad(?:e|ing)\b",
+        r"\b(?:place|submit|send|execute)\s+(?:an?\s+|the\s+|this\s+)?orders?\b",
+        r"\b(?:open|close)\s+(?:an?\s+|the\s+|this\s+)?positions?\b",
+        r"\b(?:please|should|can|could|would|when)\s+(?:i\s+|we\s+|the\s+(?:system|agent|model)\s+)?(?:buy|sell|trade|execute)\b",
+        r"^\s*(?:please\s+)?(?:buy|sell|execute|trade(?!\s+(?:policy|volume|flows?|balance|data|statistics)\b))\b",
+        r"\b(?:buy|sell|trading)\s+(?:signals?|orders?|strateg(?:y|ies)|positions?)\b",
+    )
+)
+_TRADING_INTENT_CHINESE = (
+    "下单",
+    "买入",
+    "卖出",
+    "开仓",
+    "平仓",
+    "持仓",
+    "实盘",
+    "自动交易",
+    "交易策略",
+)
+_BENIGN_CHINESE_TRADING_CONTEXT = (
+    "交易日",
+    "交易时段",
+    "交易所",
+    "交易量",
+    "交易数据",
+    "交易日期",
+    "可交易",
+)
+
+
+def _requests_trading_capability(question: str) -> bool:
+    """Classify execution intent without mistaking market-calendar terminology."""
+
+    if any(marker in question for marker in _TRADING_INTENT_CHINESE):
+        return True
+    remaining_chinese = question
+    for benign in _BENIGN_CHINESE_TRADING_CONTEXT:
+        remaining_chinese = remaining_chinese.replace(benign, "")
+    if "交易" in remaining_chinese:
+        return True
+    return any(pattern.search(question) for pattern in _TRADING_INTENT_ENGLISH)
+
 
 def _generated_text_values(proposal: "ResearchHypothesisProposal") -> list[str]:
     values = [proposal.normalized_research_question]
@@ -327,18 +382,23 @@ class ResearchHypothesisProposal(StrictResearchModel):
         if statistical.minimum_effect_size is None:
             incomplete.append("minimum effect size")
 
-        if self.claim_type is ClaimType.PREDICTIVE and target is not None:
-            tested_predictor = next(
-                item
-                for item in self.predictors
-                if item.variable_id == target.predictor_variable_id
-            )
-            timing = tested_predictor.time_relation
-            if (
-                timing.relation is not DraftTimeRelation.PRECEDES_OUTCOME
-                or timing.available_before_outcome is not True
-            ):
-                incomplete.append("predictor availability before outcome")
+        model_inputs = [*self.predictors, *self.controls]
+        if self.claim_type is ClaimType.PREDICTIVE:
+            for variable in model_inputs:
+                timing = variable.time_relation
+                if (
+                    timing.relation is not DraftTimeRelation.PRECEDES_OUTCOME
+                    or timing.available_before_outcome is not True
+                ):
+                    incomplete.append(
+                        f"predictive input {variable.variable_id} availability before outcome"
+                    )
+        elif self.claim_type is ClaimType.ASSOCIATION:
+            for variable in variables:
+                if variable.time_relation.relation is DraftTimeRelation.UNSPECIFIED:
+                    incomplete.append(
+                        f"association variable {variable.variable_id} time relation"
+                    )
 
         original_casefold = self.original_question.casefold()
         unsupported_casefold = " ".join(self.unsupported_requests).casefold()
@@ -356,10 +416,7 @@ class ResearchHypothesisProposal(StrictResearchModel):
             "backtest": (
                 "回测" in self.original_question or "backtest" in original_casefold
             ),
-            "trading": any(
-                marker in original_casefold
-                for marker in ("自动下单", "auto-trad", "交易盈利", "trading profit")
-            ),
+            "trading": _requests_trading_capability(self.original_question),
         }
         unsupported_category_markers = {
             "causal": ("因果", "causal"),

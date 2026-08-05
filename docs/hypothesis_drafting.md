@@ -62,10 +62,14 @@ plain `beta` in the rendered H0/H1 is not an unbound free-text reference. If
 stored H0/H1 differs by even one operator from the deterministic rendering, the
 proposal is invalid.
 
-An association proposal does not establish prediction or causation. A
-predictive proposal must explicitly mark the tested predictor as preceding and
-available before the outcome. Causal inference, backtesting, trading, automatic
-orders, data downloads, and unsupported methods must remain in
+An association proposal does not establish prediction or causation. Its
+outcome, predictors, and controls must all have explicit contemporaneous or
+lead/lag timing; `unspecified` timing blocks readiness. A predictive proposal
+must explicitly mark every predictor and control—not only the tested
+predictor—as preceding and available before the outcome information cutoff.
+This prevents a secondary input from introducing future information. Causal
+inference, backtesting, trading, buying or selling, order/position execution,
+live or automated trading, data downloads, and unsupported methods must remain in
 `unsupported_requests`; they cannot be silently converted into correlation or
 regression.
 
@@ -98,8 +102,10 @@ SHA-256 are reproducible.
 
 The optional DeepSeek path requires an explicit model and `--allow-network`,
 reads only `DEEPSEEK_API_KEY`, permits the official HTTPS origin, makes at most
-one request with no retry, and enforces timeout and response-size limits. Tests
-use fake backends/transports. Codex Plus generation remains unimplemented.
+one request with no retry, rejects every HTTP redirect before a second request
+can be sent, and enforces timeout and response-size limits. Authorization is
+therefore never forwarded to a redirect destination. Tests use fake
+backends/transports. Codex Plus generation remains unimplemented.
 
 ## Offline commands and example
 

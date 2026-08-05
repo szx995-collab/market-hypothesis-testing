@@ -7,7 +7,7 @@ import socket
 from typing import Any, Callable, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com"
@@ -21,6 +21,27 @@ class DeepSeekTransportError(RuntimeError):
 
 class DeepSeekTransportTimeout(DeepSeekTransportError):
     """The HTTPS request exceeded its configured timeout."""
+
+
+class _RejectRedirectHandler(HTTPRedirectHandler):
+    """Turn every redirect into an HTTP failure before a second request exists."""
+
+    def redirect_request(
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Request:
+        raise HTTPError(req.full_url, code, "DeepSeek redirect refused", headers, fp)
+
+
+def _urlopen_without_redirects(request: Request, *, timeout: float) -> Any:
+    """Open exactly one URL with redirect following disabled."""
+
+    return build_opener(_RejectRedirectHandler()).open(request, timeout=timeout)
 
 
 class DeepSeekTransport(Protocol):
@@ -58,8 +79,15 @@ class UrllibDeepSeekTransport:
     ) -> bytes:
         request = Request(url=url, data=body, headers=dict(headers), method="POST")
         try:
-            opener = self._opener or urlopen
+            opener = self._opener or _urlopen_without_redirects
             with opener(request, timeout=timeout_seconds) as response:
+                status = getattr(response, "status", None)
+                if status is None and callable(getattr(response, "getcode", None)):
+                    status = response.getcode()
+                if isinstance(status, int) and 300 <= status < 400:
+                    raise DeepSeekTransportError(
+                        f"DeepSeek returned HTTP status {status}"
+                    )
                 limit = (
                     self._response_limit()
                     if callable(self._response_limit)
