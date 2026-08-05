@@ -63,6 +63,7 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 | `spec_review` | 假设草案、用户补充信息 | 明确定义变量、数学表达、样本范围、频率、时间区间、基准、检验方法和判定标准 | 有版本的研究规格与确认记录，或修改请求 | LLM 解释规格；确定性代码校验结构与必填项；**用户必须明确确认数学定义和研究范围** |
 | `data_plan` | 已确认的研究规格 | 将每个变量映射为数据需求、字段、频率、时间覆盖、质量要求和来源选择标准 | 可审阅的数据计划，不绑定当前尚未选定的提供商 | LLM 可提出需求映射；Python 校验计划与规格的一致性；来源限制或成本变化需要用户再次确认 |
 | `source_selection` | 已确认的数据计划与当前 registry 快照 | 将每个 requirement 显式绑定到一个 registry-backed、verified 的 Provider mapping | 确定性的来源选择与确认记录，不包含网络或获取授权 | **用户必须为每个 requirement 明确选择 mapping**；Python 只做精确匹配与哈希绑定，绝不自动选择 |
+| `acquisition_request` | 已确认的来源选择、能力快照与 registry | 把选择转化为精确的公开获取请求，证明 pre-sample 解析并显式授权单次访问 | AcquisitionRequestPlan 与 DataAccessAuthorization（single-use），不执行任何数据访问 | 确定性 Python 负责能力校验与 pre-sample 证明；pre-sample 无法证明时保持 unresolved，不得授权 |
 | `data_ready` | 已批准的数据计划、获取配置及来源凭据 | 获取、校验、规范化并冻结分析所需数据 | 带来源元数据、质量检查、版本或哈希的分析数据集 | 确定性 Python 负责；若数据缺失导致样本或定义变化，必须返回 `spec_review` 并由用户确认 |
 | `analysis` | 已确认规格、冻结数据集、分析参数 | 按规格执行计算和统计检验 | 机器可读的主要估计、检验结果、诊断和运行日志 | 确定性 Python 负责计算；LLM 不生成或改写数值结果 |
 | `robustness` | 主分析结果、规格中约定的稳健性方案、冻结数据 | 执行敏感性分析、替代定义或子样本检验，并记录偏离 | 机器可读的稳健性结果、比较表和异常说明 | 确定性 Python 负责计算；新增且可能改变结论的检验应由用户确认后执行 |
@@ -72,7 +73,7 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 
 正常流转顺序为：
 
-`hypothesis_draft` → `spec_review` → `data_plan` → `source_selection` → `data_ready` → `analysis` → `robustness` → `report`
+`hypothesis_draft` → `spec_review` → `data_plan` → `source_selection` → `acquisition_request` → `data_ready` → `analysis` → `robustness` → `report`
 
 `spec_review` 是正式分析前的强制闸门。没有用户对数学定义、变量、样本和方法的明确确认，不得进入数据执行或分析。任何会实质改变已确认规格的情况——例如数据不可得、替代变量、时间范围变化或新增方法——都必须生成变更记录并返回用户确认。
 
