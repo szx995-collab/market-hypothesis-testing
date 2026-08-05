@@ -11,5 +11,6 @@ recursive-include examples *.csv *.json *.txt
 recursive-include scripts *.py
 recursive-include tests *.csv *.json *.py
 global-exclude __pycache__ *.py[cod]
+prune tests/.runtime_*
 prune .market_validator
 prune .release-check
