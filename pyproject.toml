@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "market-validator"
+version = "0.1.0"
+description = "A reproducible workflow for validating financial market hypotheses"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+keywords = ["finance", "market-research", "reproducibility", "validation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "pydantic>=2.12,<3",
+    "tzdata>=2025.2,<2027; platform_system == 'Windows'",
+]
+
+[project.urls]
+Repository = "https://github.com/szx995-collab/market-hypothesis-testing"
+Issues = "https://github.com/szx995-collab/market-hypothesis-testing/issues"
+
+[project.scripts]
+market-validator = "market_validator.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

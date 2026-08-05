@@ -1,0 +1,31 @@
+{
+  "requirement_id": "fred-wti-spot-initial",
+  "variable_id": "wti_spot_level",
+  "instrument_id": "global.crude_oil.wti_spot",
+  "asset_type": "commodity_spot",
+  "field": "value",
+  "transformation": "level",
+  "rolling_window_periods": null,
+  "start_date": "2020-01-01",
+  "end_date": "2024-12-31",
+  "frequency": "1d",
+  "lag_periods": 0,
+  "availability_lag_periods": 0,
+  "required_pre_sample_periods": 0,
+  "market": "United States crude oil spot market",
+  "calendar_id": "global.macro_release",
+  "timezone": "UTC",
+  "currency": "USD",
+  "unit": "Dollars per Barrel",
+  "price_adjustment": null,
+  "contract_roll_method": null,
+  "proxy_for": null,
+  "continuous_contract": false,
+  "information_cutoff": null,
+  "revision_policy": {
+    "mode": "initial_release",
+    "as_of_date": null
+  },
+  "status": "ready",
+  "warnings": []
+}

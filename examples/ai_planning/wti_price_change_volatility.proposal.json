@@ -1,0 +1,66 @@
+{
+  "proposal_schema_version": "1.0",
+  "original_market_question": "2020-03-01 至 2020-05-31 的 WTI 相邻有效报价价格变化波动，是否高于 2021-01-01 至 2024-12-31？",
+  "analysis_type": "price_change_volatility",
+  "market_hypothesis": "2020-03-01 至 2020-05-31 的 WTI 相邻有效报价价格变化波动，是否高于 2021-01-01 至 2024-12-31？",
+  "null_hypothesis": "shock-window per-observation price-change standard deviation is less than or equal to the reference-window standard deviation",
+  "alternative_hypothesis": "shock-window per-observation price-change standard deviation is greater than the reference-window standard deviation",
+  "decision_rule": "lower_gt_1_supported__upper_lt_1_not_supported__otherwise_insufficient",
+  "parameters": {
+    "hypothesis": "2020-03-01 至 2020-05-31 的 WTI 相邻有效报价价格变化波动，是否高于 2021-01-01 至 2024-12-31？",
+    "null_hypothesis": "shock-window per-observation price-change standard deviation is less than or equal to the reference-window standard deviation",
+    "alternative_hypothesis": "shock-window per-observation price-change standard deviation is greater than the reference-window standard deviation",
+    "shock_window": {
+      "name": "shock",
+      "start_date": "2020-03-01",
+      "end_date": "2020-05-31"
+    },
+    "reference_window": {
+      "name": "reference",
+      "start_date": "2021-01-01",
+      "end_date": "2024-12-31"
+    },
+    "analysis_as_of": "2025-01-03T00:00:00Z",
+    "grouping_date": "end_session_date",
+    "statistic": "sample_stddev_ratio",
+    "stddev_ddof": 1,
+    "mad_definition": "median_absolute_deviation_from_median",
+    "quantile_method": "linear_type_7",
+    "bootstrap_method": "moving_block",
+    "group_resampling": "independent_within_group",
+    "block_length": 5,
+    "repetitions": 10000,
+    "random_seed": 20260804,
+    "confidence_level": 0.95,
+    "conclusion_rule": "lower_gt_1_supported__upper_lt_1_not_supported__otherwise_insufficient",
+    "exclusion_precedence": "transform_gap_then_as_of_then_window_membership",
+    "main_interval_policy": "all_valid_adjacent_quotes_including_non_one_day"
+  },
+  "data_requirement": {
+    "provider_id": "fred",
+    "dataset_id": "DCOILWTICO",
+    "series_id": "DCOILWTICO",
+    "instrument_id": "global.crude_oil.wti_spot",
+    "asset_type": "commodity_spot",
+    "field": "value",
+    "transformation": "level",
+    "start_date": "2020-01-01",
+    "end_date": "2024-12-31",
+    "frequency": "1d",
+    "timezone": "UTC",
+    "currency": "USD",
+    "unit": "Dollars per Barrel",
+    "revision_policy": "initial_release",
+    "continuous_contract": false,
+    "price_adjustment": null,
+    "contract_roll_method": null
+  },
+  "assumptions": [
+    "The existing DCOILWTICO series is treated as WTI spot price observations in Dollars per Barrel.",
+    "Volatility means sample standard deviation of per-observation signed absolute price changes.",
+    "This is a retrospective comparison and not a causal, predictive, or trading claim."
+  ],
+  "ambiguities": [],
+  "unsupported_requests": [],
+  "ready_for_confirmation": true
+}

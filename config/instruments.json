@@ -1,0 +1,210 @@
+{
+  "schema_version": "1.0",
+  "instruments": [
+    {
+      "instrument_id": "cn.a_share.energy_etf_proxy",
+      "display_name": "China A-share energy sector ETF proxy",
+      "asset_type": "etf",
+      "market": "China A-share",
+      "exchange_or_venue": "Shanghai Stock Exchange",
+      "calendar_id": "cn.a_share",
+      "timezone": "Asia/Shanghai",
+      "currency": "CNY",
+      "unit": "CNY per share",
+      "aliases": ["a-share-energy-etf-example"],
+      "identity_status": "example",
+      "provider_mappings": [],
+      "notes": [
+        "Synthetic example identity; no real fund or provider symbol is asserted."
+      ]
+    },
+    {
+      "instrument_id": "cn.a_share.energy.sector_index",
+      "display_name": "China A-share energy sector index",
+      "asset_type": "sector_index",
+      "market": "China A-share",
+      "exchange_or_venue": "China securities market",
+      "calendar_id": "cn.a_share",
+      "timezone": "Asia/Shanghai",
+      "currency": "CNY",
+      "unit": "index points",
+      "aliases": ["a-share-energy-sector-index-example"],
+      "identity_status": "example",
+      "provider_mappings": [],
+      "notes": [
+        "Conceptual example identity used only by a robustness-check description."
+      ]
+    },
+    {
+      "instrument_id": "global.crude_oil.continuous_front",
+      "display_name": "International crude-oil continuous front-month futures",
+      "asset_type": "commodity_future",
+      "market": "International crude oil futures",
+      "exchange_or_venue": "International energy futures venue",
+      "calendar_id": "global.energy_futures",
+      "timezone": "America/New_York",
+      "currency": "USD",
+      "unit": "USD per barrel",
+      "aliases": ["continuous-crude-oil-example"],
+      "identity_status": "example",
+      "provider_mappings": [],
+      "notes": [
+        "Conceptual continuous-futures identity; no exchange contract or symbol is asserted."
+      ]
+    },
+    {
+      "instrument_id": "jp.nikkei_225.index",
+      "display_name": "Nikkei 225 index",
+      "asset_type": "equity_index",
+      "market": "Japan equity market",
+      "exchange_or_venue": "Tokyo securities market",
+      "calendar_id": "jp.equity",
+      "timezone": "Asia/Tokyo",
+      "currency": "JPY",
+      "unit": "index points",
+      "aliases": ["nikkei-225-example"],
+      "identity_status": "unverified",
+      "provider_mappings": [],
+      "notes": [
+        "Canonical concept is recognizable, but provider identity has not been verified."
+      ]
+    },
+    {
+      "instrument_id": "us.broad_equity.market_index",
+      "display_name": "Broad US equity market index",
+      "asset_type": "equity_index",
+      "market": "United States equity market",
+      "exchange_or_venue": "United States securities market",
+      "calendar_id": "us.equity",
+      "timezone": "America/New_York",
+      "currency": "USD",
+      "unit": "index points",
+      "aliases": ["broad-us-market-index-example"],
+      "identity_status": "example",
+      "provider_mappings": [],
+      "notes": [
+        "Conceptual market index used by the example; no real index or symbol is asserted."
+      ]
+    },
+    {
+      "instrument_id": "global.crude_oil.wti_spot",
+      "display_name": "WTI crude oil spot reference price",
+      "asset_type": "commodity_spot",
+      "market": "United States crude oil spot market",
+      "exchange_or_venue": "FRED official macro time series",
+      "calendar_id": "global.macro_release",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "Dollars per Barrel",
+      "aliases": ["wti-spot"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DCOILWTICO",
+          "dataset_or_endpoint": "/fred/series/observations",
+          "market": "United States crude oil spot market",
+          "verified": true,
+          "verified_on": "2026-08-04",
+          "verification_source_uri": "https://fred.stlouisfed.org/series/DCOILWTICO",
+          "notes": [
+            "WTI spot reference price; this is not a crude-oil futures contract."
+          ]
+        }
+      ],
+      "notes": [
+        "FRED daily WTI spot reference series; distinct from the continuous-futures example."
+      ]
+    },
+    {
+      "instrument_id": "global.crude_oil.brent_spot",
+      "display_name": "Brent crude oil spot reference price",
+      "asset_type": "commodity_spot",
+      "market": "Global crude oil spot market",
+      "exchange_or_venue": "FRED official macro time series",
+      "calendar_id": "global.macro_release",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "Dollars per Barrel",
+      "aliases": ["brent-spot"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DCOILBRENTEU",
+          "dataset_or_endpoint": "/fred/series/observations",
+          "market": "Global crude oil spot market",
+          "verified": true,
+          "verified_on": "2026-08-04",
+          "verification_source_uri": "https://fred.stlouisfed.org/series/DCOILBRENTEU",
+          "notes": [
+            "Brent spot reference price; this is not a crude-oil futures contract."
+          ]
+        }
+      ],
+      "notes": [
+        "FRED daily Brent spot reference series; no futures roll rule applies."
+      ]
+    },
+    {
+      "instrument_id": "us.dollar.nominal_broad_index",
+      "display_name": "Nominal broad U.S. dollar index",
+      "asset_type": "macro_series",
+      "market": "United States macroeconomic data",
+      "exchange_or_venue": "FRED official macro time series",
+      "calendar_id": "global.macro_release",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "Index Jan 2006=100",
+      "aliases": ["nominal-broad-us-dollar-index"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DTWEXBGS",
+          "dataset_or_endpoint": "/fred/series/observations",
+          "market": "United States macroeconomic data",
+          "verified": true,
+          "verified_on": "2026-08-04",
+          "verification_source_uri": "https://fred.stlouisfed.org/series/DTWEXBGS",
+          "notes": [
+            "Nominal broad U.S. dollar index; it must not be labeled as DXY."
+          ]
+        }
+      ],
+      "notes": [
+        "Federal Reserve nominal broad dollar index, not the ICE U.S. Dollar Index (DXY)."
+      ]
+    },
+    {
+      "instrument_id": "fx.usd_cny.reference_rate",
+      "display_name": "Chinese yuan per U.S. dollar reference rate",
+      "asset_type": "fx",
+      "market": "Foreign exchange reference rates",
+      "exchange_or_venue": "FRED official macro time series",
+      "calendar_id": "global.fx_24_5",
+      "timezone": "UTC",
+      "currency": "CNY",
+      "unit": "Chinese Yuan Renminbi to One U.S. Dollar",
+      "aliases": ["usd-cny-reference-rate"],
+      "identity_status": "verified",
+      "provider_mappings": [
+        {
+          "provider_id": "fred",
+          "provider_symbol": "DEXCHUS",
+          "dataset_or_endpoint": "/fred/series/observations",
+          "market": "Foreign exchange reference rates",
+          "verified": true,
+          "verified_on": "2026-08-04",
+          "verification_source_uri": "https://fred.stlouisfed.org/series/DEXCHUS",
+          "notes": [
+            "Quote direction is Chinese yuan renminbi per one U.S. dollar."
+          ]
+        }
+      ],
+      "notes": [
+        "Reference exchange-rate series with CNY as quote currency and USD as base currency."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0",
+  "calendars": [
+    {
+      "calendar_id": "cn.a_share",
+      "display_name": "China A-share trading calendar",
+      "timezone": "Asia/Shanghai",
+      "calendar_type": "equity_exchange",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; holidays and special sessions are not implemented."
+      ]
+    },
+    {
+      "calendar_id": "us.equity",
+      "display_name": "United States equity trading calendar",
+      "timezone": "America/New_York",
+      "calendar_type": "equity_exchange",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; DST, holidays, and half-days require a future adapter."
+      ]
+    },
+    {
+      "calendar_id": "jp.equity",
+      "display_name": "Japan equity trading calendar",
+      "timezone": "Asia/Tokyo",
+      "calendar_type": "equity_exchange",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; exchange schedules are not calculated."
+      ]
+    },
+    {
+      "calendar_id": "kr.equity",
+      "display_name": "Korea equity trading calendar",
+      "timezone": "Asia/Seoul",
+      "calendar_type": "equity_exchange",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; exchange schedules are not calculated."
+      ]
+    },
+    {
+      "calendar_id": "global.fx_24_5",
+      "display_name": "Global 24/5 foreign-exchange calendar",
+      "timezone": "UTC",
+      "calendar_type": "fx_24_5",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; daily cutoffs require a future calendar adapter."
+      ]
+    },
+    {
+      "calendar_id": "global.energy_futures",
+      "display_name": "International energy futures calendar",
+      "timezone": "America/New_York",
+      "calendar_type": "energy_futures",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; contract sessions and holidays are not calculated."
+      ]
+    },
+    {
+      "calendar_id": "global.macro_release",
+      "display_name": "Macro data release calendar",
+      "timezone": "UTC",
+      "calendar_type": "macro_release",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "Identity metadata only; release schedules are not calculated."
+      ]
+    }
+  ]
+}

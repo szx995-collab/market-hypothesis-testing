@@ -1,0 +1,140 @@
+{
+  "schema_version": "1.0",
+  "spec_id": "oil-to-a-share-energy-v1",
+  "title": "International oil returns and next tradable A-share energy ETF returns",
+  "original_hypothesis": "国际油价的日收益率是否与下一个可交易A股交易日的能源板块收益率存在正向预测关系？",
+  "normalized_hypothesis": "Test whether the log return of a continuous international crude-oil futures series known before the China A-share open positively predicts the same target session's total-return-adjusted energy ETF proxy log return.",
+  "claim_type": "predictive",
+  "outcome": {
+    "variable_id": "a_share_energy_return",
+    "role": "outcome",
+    "instrument": {
+      "instrument_id": "cn.a_share.energy_etf_proxy",
+      "display_name": "China A-share energy sector ETF proxy",
+      "asset_type": "etf",
+      "market": "China A-share",
+      "exchange_or_venue": "Shanghai Stock Exchange",
+      "timezone": "Asia/Shanghai",
+      "currency": "CNY",
+      "unit": "CNY per share",
+      "continuous_contract": false
+    },
+    "field": "close",
+    "transformation": "log_return",
+    "lag_periods": 0,
+    "availability_lag_periods": 0,
+    "price_adjustment": "total_return_adjusted",
+    "contract_roll_method": null,
+    "proxy_for": "China A-share energy sector index",
+    "rolling_window_periods": null
+  },
+  "predictors": [
+    {
+      "variable_id": "oil_return",
+      "role": "predictor",
+      "instrument": {
+        "instrument_id": "global.crude_oil.continuous_front",
+        "display_name": "International crude-oil continuous front-month futures",
+        "asset_type": "commodity_future",
+        "market": "International crude oil futures",
+        "exchange_or_venue": "International energy futures venue",
+        "timezone": "America/New_York",
+        "currency": "USD",
+        "unit": "USD per barrel",
+        "continuous_contract": true
+      },
+      "field": "settlement",
+      "transformation": "log_return",
+      "lag_periods": 0,
+      "availability_lag_periods": 0,
+      "price_adjustment": null,
+      "contract_roll_method": "volume",
+      "proxy_for": null,
+      "rolling_window_periods": null
+    }
+  ],
+  "controls": [],
+  "sample": {
+    "start_date": "2015-01-01",
+    "end_date": "2024-12-31",
+    "frequency": "1d",
+    "minimum_observations": 500
+  },
+  "alignment": {
+    "target_market": "China A-share",
+    "target_timezone": "Asia/Shanghai",
+    "target_calendar": "China A-share trading calendar",
+    "target_session": "regular_session",
+    "information_cutoff": {
+      "type": "before_target_open",
+      "local_time": null,
+      "timezone": null
+    },
+    "join_policy": "last_completed_before_cutoff",
+    "max_staleness_days": 3,
+    "missing_data_policy": "drop_observation"
+  },
+  "model": {
+    "method": "lead_lag_regression",
+    "formula": "a_share_energy_return ~ oil_return",
+    "formula_variable_ids": [
+      "a_share_energy_return",
+      "oil_return"
+    ],
+    "null_hypothesis": "The oil-return coefficient is less than or equal to zero.",
+    "alternative_hypothesis": "The oil-return coefficient is greater than zero.",
+    "direction": "positive",
+    "significance_level": 0.05,
+    "minimum_effect_size": 0.001,
+    "multiple_testing_correction": "none"
+  },
+  "robustness_checks": [
+    {
+      "type": "alternate_time_window",
+      "start_date": "2018-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "type": "alternate_proxy",
+      "variable_id": "a_share_energy_return",
+      "replacement_instrument": {
+        "instrument_id": "cn.a_share.energy.sector_index",
+        "display_name": "China A-share energy sector index",
+        "asset_type": "sector_index",
+        "market": "China A-share",
+        "exchange_or_venue": "China securities market",
+        "timezone": "Asia/Shanghai",
+        "currency": "CNY",
+        "unit": "index points",
+        "continuous_contract": false
+      },
+      "reason": "Check whether results depend on using an ETF as the sector proxy."
+    },
+    {
+      "type": "alternate_return_definition",
+      "variable_id": "oil_return",
+      "transformation": "simple_return"
+    },
+    {
+      "type": "lag_sensitivity",
+      "variable_id": "oil_return",
+      "lag_periods": [0, 1, 2]
+    },
+    {
+      "type": "exclude_period",
+      "start_date": "2020-02-01",
+      "end_date": "2020-06-30",
+      "reason": "Exclude the exceptional pandemic and oil-market disruption window."
+    }
+  ],
+  "assumptions": [
+    "The selected oil settlement is published before the matched China A-share session opens.",
+    "The ETF is an explicit proxy for the formal energy sector index rather than the index itself.",
+    "The volume-based continuous-futures roll rule is applied consistently without look-ahead."
+  ],
+  "limitations": [
+    "Predictive association does not establish that oil-price changes cause sector returns.",
+    "Holiday differences and stale oil observations can reduce the effective sample.",
+    "ETF tracking error may differ from the formal sector index."
+  ]
+}

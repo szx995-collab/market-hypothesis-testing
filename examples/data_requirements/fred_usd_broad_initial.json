@@ -1,0 +1,31 @@
+{
+  "requirement_id": "fred-usd-broad-initial",
+  "variable_id": "nominal_broad_usd_level",
+  "instrument_id": "us.dollar.nominal_broad_index",
+  "asset_type": "macro_series",
+  "field": "value",
+  "transformation": "level",
+  "rolling_window_periods": null,
+  "start_date": "2020-01-01",
+  "end_date": "2024-12-31",
+  "frequency": "1d",
+  "lag_periods": 0,
+  "availability_lag_periods": 0,
+  "required_pre_sample_periods": 0,
+  "market": "United States macroeconomic data",
+  "calendar_id": "global.macro_release",
+  "timezone": "UTC",
+  "currency": "USD",
+  "unit": "Index Jan 2006=100",
+  "price_adjustment": null,
+  "contract_roll_method": null,
+  "proxy_for": null,
+  "continuous_contract": false,
+  "information_cutoff": null,
+  "revision_policy": {
+    "mode": "initial_release",
+    "as_of_date": null
+  },
+  "status": "ready",
+  "warnings": []
+}

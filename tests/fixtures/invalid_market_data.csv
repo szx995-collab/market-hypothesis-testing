@@ -1,0 +1,10 @@
+instrument_id,field,value,observation_time,available_time,session_date,timezone,currency,unit
+cn.a_share.energy_etf_proxy,close,100.00,2024-01-02T15:00:00+08:00,2024-01-02T15:05:00+08:00,2024-01-02,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,100.10,2024-01-02T15:00:00+08:00,2024-01-02T15:06:00+08:00,2024-01-02,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,,2024-01-03T15:00:00+08:00,2024-01-03T15:05:00+08:00,2024-01-03,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,NaN,2024-01-03T15:00:00+08:00,2024-01-03T15:05:00+08:00,2024-01-03,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,101.00,2024-01-03T15:00:00,2024-01-03T15:05:00+08:00,2024-01-03,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,101.10,2024-01-03T15:00:00+08:00,2024-01-03T14:59:00+08:00,2024-01-03,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,99.50,2024-01-01T15:00:00+08:00,2024-01-01T15:05:00+08:00,2024-01-01,Asia/Shanghai,CNY,CNY per share
+cn.a_share.energy_etf_proxy,close,102.00,2024-01-04T15:00:00+08:00,2024-01-04T15:05:00+08:00,2024-01-04,Asia/Tokyo,USD,index points
+unexpected.instrument,unexpected_field,1.00,2024-01-05T15:00:00+08:00,2024-01-05T15:05:00+08:00,2024-01-05,Asia/Shanghai,CNY,CNY per share

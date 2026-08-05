@@ -1,0 +1,121 @@
+{
+  "schema_version": "1.0",
+  "spec_id": "nikkei-to-us-market-v1",
+  "title": "Nikkei 225 close-to-close return and the subsequent US market session",
+  "original_hypothesis": "日经225收盘后的当日收益率，是否与随后美国市场交易时段的收益率相关？",
+  "normalized_hypothesis": "Test the association between a Nikkei 225 log return from the last observation completed before the US market open and the log return of the subsequent US regular trading session.",
+  "claim_type": "association",
+  "outcome": {
+    "variable_id": "us_market_return",
+    "role": "outcome",
+    "instrument": {
+      "instrument_id": "us.broad_equity.market_index",
+      "display_name": "Broad US equity market index",
+      "asset_type": "equity_index",
+      "market": "United States equity market",
+      "exchange_or_venue": "United States securities market",
+      "timezone": "America/New_York",
+      "currency": "USD",
+      "unit": "index points",
+      "continuous_contract": false
+    },
+    "field": "close",
+    "transformation": "log_return",
+    "lag_periods": 0,
+    "availability_lag_periods": 0,
+    "price_adjustment": null,
+    "contract_roll_method": null,
+    "proxy_for": null,
+    "rolling_window_periods": null
+  },
+  "predictors": [
+    {
+      "variable_id": "nikkei_225_return",
+      "role": "predictor",
+      "instrument": {
+        "instrument_id": "jp.nikkei_225.index",
+        "display_name": "Nikkei 225 index",
+        "asset_type": "equity_index",
+        "market": "Japan equity market",
+        "exchange_or_venue": "Tokyo securities market",
+        "timezone": "Asia/Tokyo",
+        "currency": "JPY",
+        "unit": "index points",
+        "continuous_contract": false
+      },
+      "field": "close",
+      "transformation": "log_return",
+      "lag_periods": 0,
+      "availability_lag_periods": 0,
+      "price_adjustment": null,
+      "contract_roll_method": null,
+      "proxy_for": null,
+      "rolling_window_periods": null
+    }
+  ],
+  "controls": [],
+  "sample": {
+    "start_date": "2010-01-01",
+    "end_date": "2024-12-31",
+    "frequency": "1d",
+    "minimum_observations": 1000
+  },
+  "alignment": {
+    "target_market": "United States equity market",
+    "target_timezone": "America/New_York",
+    "target_calendar": "United States equity trading calendar",
+    "target_session": "regular_session",
+    "information_cutoff": {
+      "type": "before_target_open",
+      "local_time": null,
+      "timezone": null
+    },
+    "join_policy": "last_completed_before_cutoff",
+    "max_staleness_days": 3,
+    "missing_data_policy": "drop_observation"
+  },
+  "model": {
+    "method": "pearson_correlation",
+    "formula": "correlation(us_market_return, nikkei_225_return)",
+    "formula_variable_ids": [
+      "us_market_return",
+      "nikkei_225_return"
+    ],
+    "null_hypothesis": "The population correlation is zero.",
+    "alternative_hypothesis": "The population correlation is not zero.",
+    "direction": "two_sided",
+    "significance_level": 0.05,
+    "minimum_effect_size": 0.05,
+    "multiple_testing_correction": "none"
+  },
+  "robustness_checks": [
+    {
+      "type": "alternate_time_window",
+      "start_date": "2015-01-01",
+      "end_date": "2024-12-31"
+    },
+    {
+      "type": "alternate_return_definition",
+      "variable_id": "nikkei_225_return",
+      "transformation": "simple_return"
+    },
+    {
+      "type": "multiple_testing_correction",
+      "correction": "holm"
+    },
+    {
+      "type": "exclude_period",
+      "start_date": "2020-02-01",
+      "end_date": "2020-06-30",
+      "reason": "Exclude the most disrupted early-pandemic trading period."
+    }
+  ],
+  "assumptions": [
+    "The Nikkei 225 close and its daily return are available before the subsequent US regular session opens.",
+    "Each predictor observation is selected by completion time relative to the US cutoff, not by an implicit same-date join."
+  ],
+  "limitations": [
+    "The design estimates association and does not claim a causal effect from Japan to the United States.",
+    "Non-overlapping holidays and daylight-saving transitions may change which observation is the last completed one."
+  ]
+}

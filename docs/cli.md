@@ -1,0 +1,206 @@
+# Workflow and proposal CLI
+
+The CLI is a stable, script-oriented wrapper around the existing deterministic
+workflow, strict artifact loader, and optional proposal-only AI adapter. It does
+not implement analysis itself. All commands are offline except the explicitly
+authorized `propose-plan --allow-network` request.
+
+## Installation and equivalent entry points
+
+Install the local package from the repository root:
+
+```powershell
+python -m pip install -e .
+```
+
+These entry points use the same parser and handlers:
+
+```powershell
+market-validator --help
+python -m market_validator --help
+```
+
+No input path is inferred from the current directory or environment variables.
+Every question, provider, model, proposal output, plan, Bundle, artifact root,
+artifact directory, and external Manifest hash required by a command must be
+explicit. Omitting `--allow-network` from `propose-plan` returns exit code 2
+before provider construction.
+
+## Proposal and plan examples
+
+The planning layer examples are in `examples/ai_planning/`. Validate an
+untrusted proposal without executing anything:
+
+Generate a new proposal through the optional DeepSeek adapter only after
+explicitly allowing one network request:
+
+```powershell
+market-validator propose-plan `
+  --question-file examples/ai_planning/wti_question.txt `
+  --provider deepseek_api `
+  --model deepseek-v4-flash `
+  --output <proposal.json> `
+  --allow-network
+```
+
+This command writes only a strictly parsed canonical proposal. It never creates
+a confirmation, WorkflowPlan, or artifact and never invokes `compile-plan` or
+`run`. Credentials come only from `DEEPSEEK_API_KEY`; they are not written or
+printed.
+
+Validate an existing untrusted proposal without executing anything:
+
+```powershell
+market-validator validate-proposal examples/ai_planning/wti_price_change_volatility.proposal.json
+```
+
+After the user has separately confirmed the exact canonical proposal SHA-256,
+bind it to an explicit local Bundle and write only a WorkflowPlan:
+
+```powershell
+market-validator compile-plan `
+  --proposal examples/ai_planning/wti_price_change_volatility.proposal.json `
+  --confirmation examples/ai_planning/wti_price_change_volatility.confirmation.json `
+  --bundle <bundle.json> `
+  --output <workflow-plan.json>
+```
+
+`compile-plan` is create-only, atomic, and idempotent for identical bytes. It
+does not call `run` or publish an analysis artifact. A different existing plan
+is a conflict. Confirmation is hash-bound but is not a digital signature or
+execution authorization. See [`ai_planning.md`](ai_planning.md).
+
+The complete golden WTI plan is
+[`examples/workflow_plans/fred_wti_price_change_volatility.json`](../examples/workflow_plans/fred_wti_price_change_volatility.json).
+Its essential shape is:
+
+```json
+{
+  "workflow_schema_version": "1.0",
+  "analysis_type": "price_change_volatility",
+  "expected_source_request_id": "fred-dcoilwtico-...",
+  "expected_source_bundle_sha256": "<64 lowercase hex characters>",
+  "parameters": {
+    "analysis_as_of": "2025-01-03T00:00:00Z",
+    "block_length": 5,
+    "repetitions": 10000,
+    "random_seed": 20260804
+  },
+  "expected_artifact_manifest_sha256": "<optional external trust anchor>"
+}
+```
+
+The real file contains every fixed `PriceChangeVolatilityParameters` field.
+Unknown fields and unknown analysis types are rejected. The CLI accepts only a
+regular, non-symbolic-link UTF-8 JSON plan file.
+
+## Commands
+
+Validate a plan without executing analysis or writing an artifact:
+
+```powershell
+market-validator validate-plan examples/workflow_plans/fred_wti_price_change_volatility.json
+```
+
+Run the sole supported offline workflow. All locations are mandatory:
+
+```powershell
+market-validator run `
+  --plan examples/workflow_plans/fred_wti_price_change_volatility.json `
+  --bundle .market_validator/data/bundles/fred/fred-dcoilwtico-20260804T085757136534Z-58aa38ed3b12.json `
+  --artifact-root .market_validator/analysis_artifacts
+```
+
+Strictly verify an existing artifact without recalculating or repairing it:
+
+```powershell
+market-validator verify-artifact `
+  --artifact .market_validator/analysis_artifacts/price-change-volatility-0796a66788e5cfd71dff6a3222dd5cab `
+  --expected-manifest-sha256 5be9387e8425838931618c585805a19e046a4b4ba9da5950373d83385e960a2e
+```
+
+The same arguments work after `python -m market_validator`.
+
+## JSON streams
+
+Successful command results are one deterministic UTF-8 JSON object on stdout;
+stderr is empty:
+
+```json
+{"data": {"...": "validated data"}, "ok": true}
+```
+
+Failures write one JSON object to stderr and leave stdout empty. Tracebacks are
+not emitted by default:
+
+```json
+{
+  "error": {
+    "code": "artifact_verification_failed",
+    "message": "strict artifact verification failed",
+    "stage": "artifact_verification"
+  },
+  "ok": false
+}
+```
+
+`insufficient_evidence` is a successful statistical conclusion and therefore
+uses exit code 0.
+
+## Stable exit codes
+
+| Exit code | Meaning |
+|---:|---|
+| 0 | Success, including `insufficient_evidence` |
+| 2 | CLI arguments, plan path/UTF-8, or malformed JSON error |
+| 3 | `invalid_plan` |
+| 4 | `workflow_path_error` |
+| 5 | `source_identity_mismatch` |
+| 6 | `analysis_contract_mismatch` |
+| 7 | `analysis_failed` |
+| 8 | `artifact_conflict` |
+| 9 | `artifact_verification_failed` |
+| 10 | Unexpected internal CLI error |
+| 11 | `invalid_proposal` |
+| 12 | `invalid_confirmation` |
+| 13 | `confirmation_mismatch` |
+| 14 | `proposal_not_confirmable` |
+| 15 | `proposal_data_contract_mismatch` |
+| 16 | `plan_output_conflict` |
+| 17 | `plan_output_error` |
+| 18 | `provider_configuration_missing` |
+| 19 | `provider_request_failed` |
+| 20 | `provider_timeout` |
+| 21 | `provider_refused` |
+| 22 | `provider_invalid_proposal` |
+| 23 | `proposal_output_conflict` |
+| 24 | `proposal_output_error` |
+
+## Trust and responsibility boundary
+
+The external Manifest SHA-256 is checked before strict artifact parsing. It can
+detect coordinated replacement only when retained separately from the artifact
+package; it is not a digital signature or proof of authorship.
+
+The responsibility chain is:
+
+```text
+natural-language question
+→ optional AI provider emits an untrusted proposal
+→ strict parsing and capability checks
+→ user confirms the canonical proposal SHA-256
+→ deterministic code binds the explicit Bundle and emits a WorkflowPlan
+→ user separately invokes run
+→ deterministic workflow transforms, analyzes, persists, and strictly reloads
+→ AI may explain only the verified result
+→ user makes the final judgment
+```
+
+The CLI can explicitly ask the optional AI adapter for proposal text, validate
+a preconstructed proposal, and compile an explicitly confirmed proposal against
+an existing local Bundle. Only `propose-plan --allow-network` may call a model;
+only the separate `run` command executes the existing
+`price_change_volatility` workflow. The AI provider is not a data source,
+statistical engine, confirmer, compiler, or executor. The CLI does not contact
+FRED, automatically confirm or execute a proposal, run generic analysis,
+regression, correlation, or backtesting, or expose an API service.

@@ -1,0 +1,116 @@
+name: offline-test-and-build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build-install:
+    name: ${{ matrix.os }} / Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.11", "3.13"]
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+            venv-python: .ci-test/bin/python
+          - os: ubuntu-latest
+            python-version: "3.13"
+            venv-python: .ci-test/bin/python
+          - os: windows-latest
+            python-version: "3.11"
+            venv-python: .ci-test/Scripts/python.exe
+          - os: windows-latest
+            python-version: "3.13"
+            venv-python: .ci-test/Scripts/python.exe
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      # This is the only dependency-bootstrap step allowed to contact PyPI.
+      # Tests, builds, and distribution installs below use this local wheelhouse.
+      - name: Bootstrap local dependency wheelhouse
+        run: >-
+          python -m pip download --dest .ci-wheelhouse
+          "pydantic>=2.12,<3"
+          "tzdata>=2025.2,<2027"
+          "setuptools>=77,<83"
+          "wheel>=0.45,<1"
+          "build>=1.2,<2"
+
+      - name: Create isolated test environment
+        run: python -m venv .ci-test
+
+      - name: Install test and build requirements offline
+        env:
+          PIP_NO_INDEX: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: >-
+          ${{ matrix.venv-python }} -m pip install
+          --no-index --find-links=.ci-wheelhouse
+          "pydantic>=2.12,<3"
+          "tzdata>=2025.2,<2027; platform_system == 'Windows'"
+          "setuptools>=77,<83"
+          "wheel>=0.45,<1"
+          "build>=1.2,<2"
+
+      - name: Install project editable offline
+        env:
+          PIP_NO_INDEX: "1"
+          PIP_DISABLE_PIP_VERSION_CHECK: "1"
+        run: >-
+          ${{ matrix.venv-python }} -m pip install
+          --no-index --no-deps --no-build-isolation -e .
+
+      - name: Audit tracked repository files
+        env:
+          DEEPSEEK_API_KEY: ""
+          FRED_API_KEY: ""
+        run: ${{ matrix.venv-python }} scripts/release_audit.py --root .
+
+      - name: Run offline test suite
+        env:
+          DEEPSEEK_API_KEY: ""
+          FRED_API_KEY: ""
+          NO_PROXY: "*"
+          PIP_NO_INDEX: "1"
+          PYTHONNOUSERSITE: "1"
+        run: ${{ matrix.venv-python }} -m unittest discover -s tests
+
+      - name: Build wheel and sdist twice offline
+        env:
+          DEEPSEEK_API_KEY: ""
+          FRED_API_KEY: ""
+          PIP_FIND_LINKS: .ci-wheelhouse
+          PIP_NO_INDEX: "1"
+          PYTHONNOUSERSITE: "1"
+          SOURCE_DATE_EPOCH: "1704067200"
+        run: |
+          ${{ matrix.venv-python }} scripts/build_release.py --output-dir .ci-dist-a --source-date-epoch 1704067200
+          ${{ matrix.venv-python }} scripts/build_release.py --output-dir .ci-dist-b --source-date-epoch 1704067200
+
+      - name: Verify wheel and sdist in separate fresh environments
+        env:
+          DEEPSEEK_API_KEY: ""
+          FRED_API_KEY: ""
+          PIP_NO_INDEX: "1"
+          PYTHONNOUSERSITE: "1"
+        run: >-
+          ${{ matrix.venv-python }} scripts/verify_distributions.py
+          --dist .ci-dist-a
+          --reproducible-against .ci-dist-b
+          --wheelhouse .ci-wheelhouse
+          --work-root .ci-install-check
+          --proposal examples/ai_planning/wti_price_change_volatility.proposal.json
