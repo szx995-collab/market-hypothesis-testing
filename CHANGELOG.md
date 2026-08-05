@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-05
+
 ### Added
 
 - 独立、严格的 `ResearchHypothesisProposal`，用于从通用自然语言问题保存变量角色、概念变换、时间方向、样本/对齐草案、目标参数、H0/H1、歧义和不支持请求。
@@ -52,5 +54,6 @@
 - 为 Windows 声明 IANA 时区数据库条件依赖，确保全新安装后的 `zoneinfo` 验证可用。
 - 排除测试生成的 `.runtime_*` 目录，并在分发包验收时拒绝此类运行时产物。
 
-[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/szx995-collab/market-hypothesis-testing/releases/tag/v0.1.0
