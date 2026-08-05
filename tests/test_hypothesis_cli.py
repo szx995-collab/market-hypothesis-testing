@@ -7,6 +7,7 @@ from io import StringIO
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,12 @@ def _invoke(arguments: list[str]) -> tuple[int, str, str]:
 
 class HypothesisCliTest(unittest.TestCase):
     def test_schema_is_offline_json_and_both_entry_points_match(self) -> None:
+        console_script = shutil.which("market-validator")
+        if console_script is None:
+            executable_name = (
+                "market-validator.exe" if os.name == "nt" else "market-validator"
+            )
+            console_script = str(Path(sys.executable).with_name(executable_name))
         module = subprocess.run(
             [sys.executable, "-m", "market_validator", "hypothesis", "schema"],
             cwd=ROOT,
@@ -56,7 +63,7 @@ class HypothesisCliTest(unittest.TestCase):
             check=False,
         )
         script = subprocess.run(
-            ["market-validator", "hypothesis", "schema"],
+            [console_script, "hypothesis", "schema"],
             cwd=ROOT,
             capture_output=True,
             text=True,
