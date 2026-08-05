@@ -6,7 +6,7 @@
 
 `market-validator` is a security-conscious, auditable, and reproducible workflow for validating financial-market hypotheses. It strictly separates research proposals from deterministic execution: AI may propose a plan and explain a verified result, while data facts, transformations, statistics, decision rules, and artifact verification come from tested Python code.
 
-The project is currently Alpha software. Its only end-to-end analysis is a predefined comparison of WTI price-change volatility. It is not a general quantitative platform, investment adviser, causal inference engine, or trading system.
+The project is currently Alpha software. It can draft a general statistical hypothesis proposal, but its only end-to-end analysis remains a predefined comparison of WTI price-change volatility. It is not a general quantitative platform, investment adviser, causal inference engine, or trading system.
 
 ### Goals and non-goals
 
@@ -34,6 +34,8 @@ User market question
 
 The optional AI Provider receives only the original question, a fixed system prompt, the proposal JSON Schema, and the supported-capability description. It never receives a Bundle, local path, request ID, hash, artifact identity, or credential. Model generation is nondeterministic; only canonical proposal bytes and their SHA-256 are reproducible. Every changed proposal requires fresh review and confirmation.
 
+The hash-confirm/compile/run flow above currently applies only to the fixed WTI workflow proposal. A generic `ResearchHypothesisProposal` stops after strict validation and user clarification; its confirmation and ResearchSpec compiler are future work.
+
 `--allow-network` authorizes one proposal-generation network request only. It is not confirmation and does not authorize `compile-plan`, `run`, data downloads, or artifact publication. Provider names, models, and availability may change; verify current official documentation before making a real request.
 
 ### Current capabilities
@@ -46,8 +48,9 @@ The optional AI Provider receives only the original question, a fixed system pro
 - A predefined WTI `price_change_volatility` analysis with bootstrap and robustness checks.
 - Deterministic analysis artifacts, Manifest validation, strict reload, workflow, and offline CLI.
 - An optional proposal-only DeepSeek adapter with bounded requests and no automatic retries.
+- A strict, provider-neutral `ResearchHypothesisProposal` for general natural-language association/predictive questions, deterministic H0/H1 validation, explicit ambiguities, Schema, canonical JSON, SHA-256, and safe create-only output.
 
-Not implemented: general natural-language mapping, automatic provider selection, online market-data workflows, general cross-market calendar alignment, generic correlation/regression/causal analysis, backtesting, automatic confirmation/execution, or trading.
+Not implemented: converting a confirmed generic hypothesis proposal into ResearchSpec, automatic provider selection, online market-data workflows, general cross-market calendar alignment, generic correlation/regression/causal execution, backtesting, automatic confirmation/execution, or trading.
 
 ### Quick start
 
@@ -56,6 +59,8 @@ python -m pip install -e .
 python -m market_validator doctor
 market-validator doctor
 python -m market_validator backends
+python -m market_validator hypothesis schema
+python -m market_validator hypothesis validate-proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
 python -m unittest discover -s tests
 ```
 
@@ -79,6 +84,17 @@ python -m market_validator run `
 ```
 
 The optional network proposal command only creates a strictly parsed proposal; it never confirms, compiles, or runs it:
+
+```powershell
+python -m market_validator propose-hypothesis `
+  --question-file examples/hypothesis_proposals/oil_to_a_share_energy.question.txt `
+  --provider deepseek_api `
+  --model <verified-current-model> `
+  --output <new-hypothesis-proposal.json> `
+  --allow-network
+```
+
+This generic draft command identifies variables, timing, method, direction, deterministic H0/H1, and unresolved choices. It does not confirm the draft or build ResearchSpec. The older fixed-capability workflow proposal remains separate:
 
 ```powershell
 python -m market_validator propose-plan `
@@ -119,7 +135,7 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 
 `market-validator` 是一个强调安全边界、可审计性和可复现性的金融市场假设验证项目。它把“提出研究计划”和“执行确定性计算”严格分开：AI 只能提出待审阅的计划和解释已经验证的结果，数据事实、转换、统计量、结论判定与产物校验均来自确定性 Python 代码。
 
-项目目前处于 Alpha 阶段，只支持一个预先固定的 WTI 价格变化波动比较。它不是通用量化平台、投资顾问或交易系统。
+项目目前处于 Alpha 阶段，能够生成通用统计假设草案，但端到端分析仍只支持一个预先固定的 WTI 价格变化波动比较。它不是通用量化平台、投资顾问或交易系统。
 
 ## 项目目标
 
@@ -146,6 +162,7 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 - 固定 WTI `price_change_volatility` 分析、Bootstrap、稳健性检查。
 - 确定性分析 artifact、Manifest、严格回读和统一 workflow。
 - 可选、proposal-only 的 DeepSeek AI Provider。
+- 独立、严格的通用 `ResearchHypothesisProposal`：表达 association/predictive 问题、变量角色、变换、时间方向、方法、目标参数、确定性 H0/H1、歧义和不支持请求。
 
 ## 架构与信任边界
 
@@ -167,6 +184,8 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 AI Provider 只接收原始问题、固定 system prompt、proposal JSON Schema 和当前能力说明。它不是数据源、统计引擎、确认者、编译器或执行者；它不会获得 Bundle、路径、request ID、哈希、artifact 身份或凭据内容。
 
 模型生成本身不确定。只有经过严格解析后的规范化 proposal 字节及其 SHA-256 可复现；生成内容只要变化，就必须重新审阅和确认。
+
+上述哈希确认、编译和运行链目前只适用于固定 WTI workflow proposal。通用 `ResearchHypothesisProposal` 本轮只到严格验证和用户澄清；确认协议及 ResearchSpec 编译器尚未实现。
 
 ### 网络授权
 
@@ -195,6 +214,8 @@ python -m market_validator doctor
 python -m market_validator backends
 python -m market_validator spec schema
 python -m market_validator spec validate examples/research_specs/oil_to_a_share_energy.json
+python -m market_validator hypothesis schema
+python -m market_validator hypothesis validate-proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
 python -m market_validator data registry validate
 python -m market_validator data fred fetch examples/data_requirements/fred_wti_spot_initial.json
 python -m market_validator validate-proposal examples/ai_planning/wti_price_change_volatility.proposal.json
@@ -207,6 +228,21 @@ python -m unittest discover -s tests
 
 API Key 只从 `DEEPSEEK_API_KEY` 环境变量读取，不写入参数、prompt、异常、日志、路径或 proposal。下面是供用户在验收后自行授权的命令；默认测试不会执行它：
 
+通用统计假设草案：
+
+```powershell
+python -m market_validator propose-hypothesis `
+  --question-file examples/hypothesis_proposals/oil_to_a_share_energy.question.txt `
+  --provider deepseek_api `
+  --model <明确且已核验的模型名> `
+  --output <new-hypothesis-proposal.json> `
+  --allow-network
+```
+
+该命令只识别研究变量、角色、变换、时间方向、方法、检验方向和歧义。Python 严格验证目标参数及 H0/H1，并保存规范化 JSON 与 SHA-256。它不确认草案、不构建 ResearchSpec、不获取数据也不执行统计。
+
+固定 WTI workflow plan proposal：
+
 ```powershell
 python -m market_validator propose-plan `
   --question-file examples/ai_planning/wti_question.txt `
@@ -216,7 +252,7 @@ python -m market_validator propose-plan `
   --allow-network
 ```
 
-该命令只原子写入严格解析后的 proposal。它不会自动确认、编译、运行或生成 artifact。通用 `StructuredGenerationBackend.generate()` 的原有占位行为保持不变。
+两条命令都只原子写入严格解析后的 proposal，不会自动确认、编译、运行或生成 artifact。DeepSeek 的结构化生成必须显式授权联网且最多发送一次无重试请求；Codex Plus 生成仍未实现。
 
 ## 用户确认、编译和运行
 
@@ -300,6 +336,7 @@ GitHub Actions 在 Windows 和 Linux、Python 3.11 和 3.13 上执行上述流�
 - [凭据](docs/credentials.md)
 - [Provider 安全](docs/provider_security.md)
 - [AI planning](docs/ai_planning.md)
+- [统计假设草案](docs/hypothesis_drafting.md)
 - [Workflow](docs/workflow.md)
 - [CLI](docs/cli.md)
 - [分析产物](docs/analysis_artifacts.md)
@@ -311,10 +348,10 @@ GitHub Actions 在 Windows 和 Linux、Python 3.11 和 3.13 上执行上述流�
 
 尚未实现：
 
-- 通用自然语言到 ResearchSpec/Proposal 的映射；
+- 从已澄清并确认的通用 Hypothesis Proposal 构建 ResearchSpec；
 - 自动数据源选择或联网市场数据 workflow；
 - 通用跨市场交易日历对齐执行；
-- 通用相关性、回归、因果推断、回测或报告生成；
+- 通用相关性、回归、因果推断、回测或报告执行；
 - 自动确认、自动编译、自动执行和真实交易。
 
 后续工作应继续遵守“AI 提案、用户确认、确定性执行、严格回读”的顺序，不得扩张 AI 权限。

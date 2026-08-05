@@ -6,13 +6,19 @@ from collections.abc import Mapping
 import json
 import math
 import os
-import socket
-from typing import NoReturn, Protocol
-from urllib.error import HTTPError, URLError
-from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from typing import NoReturn
 
-from market_validator.backends.deepseek_api import DEFAULT_BASE_URL
+from market_validator.deepseek_transport import (
+    DEFAULT_DEEPSEEK_BASE_URL,
+    DEFAULT_DEEPSEEK_TIMEOUT_SECONDS,
+    MAX_DEEPSEEK_RESPONSE_BYTES,
+    DeepSeekTransport,
+    DeepSeekTransportError,
+    DeepSeekTransportTimeout,
+    UrllibDeepSeekTransport,
+    _urlopen_without_redirects,
+    validated_deepseek_endpoint,
+)
 from market_validator.plan_providers.base import (
     PlanProposalGenerationRequest,
     PlanProposalProviderError,
@@ -23,63 +29,27 @@ from market_validator.plan_providers.base import (
 )
 
 
-DEFAULT_TIMEOUT_SECONDS = 120.0
+DEFAULT_BASE_URL = DEFAULT_DEEPSEEK_BASE_URL
+DEFAULT_TIMEOUT_SECONDS = DEFAULT_DEEPSEEK_TIMEOUT_SECONDS
 DEFAULT_MAX_TOKENS = 8192
-MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+MAX_RESPONSE_BYTES = MAX_DEEPSEEK_RESPONSE_BYTES
+DeepSeekPlanTransport = DeepSeekTransport
 
 
-class DeepSeekTransportError(RuntimeError):
-    """Sanitized transport error containing no response body or credentials."""
+class UrllibDeepSeekPlanTransport(UrllibDeepSeekTransport):
+    """Compatibility wrapper retaining the historical mock injection point."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            opener=lambda *args, **kwargs: urlopen(*args, **kwargs),
+            response_limit=lambda: MAX_RESPONSE_BYTES,
+        )
 
 
-class DeepSeekTransportTimeout(DeepSeekTransportError):
-    """The HTTPS request exceeded its configured timeout."""
+def urlopen(*args: object, **kwargs: object) -> object:
+    """Compatibility injection point that still enforces no redirects."""
 
-
-class DeepSeekPlanTransport(Protocol):
-    def post_json(
-        self,
-        *,
-        url: str,
-        headers: Mapping[str, str],
-        body: bytes,
-        timeout_seconds: float,
-    ) -> bytes:
-        """Send one non-streaming JSON request and return response bytes."""
-
-
-class UrllibDeepSeekPlanTransport:
-    """Small standard-library HTTPS transport with sanitized exceptions."""
-
-    def post_json(
-        self,
-        *,
-        url: str,
-        headers: Mapping[str, str],
-        body: bytes,
-        timeout_seconds: float,
-    ) -> bytes:
-        request = Request(url=url, data=body, headers=dict(headers), method="POST")
-        try:
-            with urlopen(request, timeout=timeout_seconds) as response:
-                payload = response.read(MAX_RESPONSE_BYTES + 1)
-                if len(payload) > MAX_RESPONSE_BYTES:
-                    raise DeepSeekTransportError(
-                        "DeepSeek response exceeded the safe size limit"
-                    )
-                return payload
-        except HTTPError as exc:
-            raise DeepSeekTransportError(
-                f"DeepSeek returned HTTP status {exc.code}"
-            ) from None
-        except (TimeoutError, socket.timeout) as exc:
-            raise DeepSeekTransportTimeout("DeepSeek request timed out") from exc
-        except URLError as exc:
-            if isinstance(exc.reason, (TimeoutError, socket.timeout)):
-                raise DeepSeekTransportTimeout("DeepSeek request timed out") from exc
-            raise DeepSeekTransportError("DeepSeek HTTPS request failed") from None
-        except OSError:
-            raise DeepSeekTransportError("DeepSeek HTTPS request failed") from None
+    return _urlopen_without_redirects(*args, **kwargs)
 
 
 def _fail(
@@ -94,36 +64,13 @@ def _fail(
 
 def _validated_endpoint(base_url: str) -> str:
     try:
-        parsed = urlsplit(base_url)
-        port = parsed.port
-    except (TypeError, ValueError):
-        _fail(
-            PlanProposalProviderErrorCode.PROVIDER_CONFIGURATION_MISSING,
-            PlanProposalProviderStage.PROVIDER_CONFIGURATION,
-            "DEEPSEEK_BASE_URL must be a valid HTTPS origin",
-        )
-    if (
-        parsed.scheme != "https"
-        or parsed.hostname != "api.deepseek.com"
-        or port not in {None, 443}
-        or parsed.username is not None
-        or parsed.password is not None
-        or parsed.query
-        or parsed.fragment
-    ):
+        return validated_deepseek_endpoint(base_url)
+    except ValueError:
         _fail(
             PlanProposalProviderErrorCode.PROVIDER_CONFIGURATION_MISSING,
             PlanProposalProviderStage.PROVIDER_CONFIGURATION,
             "DEEPSEEK_BASE_URL must be the credential-free official DeepSeek HTTPS origin",
         )
-    path = parsed.path.rstrip("/")
-    if path not in {"", "/v1"}:
-        _fail(
-            PlanProposalProviderErrorCode.PROVIDER_CONFIGURATION_MISSING,
-            PlanProposalProviderStage.PROVIDER_CONFIGURATION,
-            "DEEPSEEK_BASE_URL path must be empty or /v1",
-        )
-    return base_url.rstrip("/") + "/chat/completions"
 
 
 class DeepSeekApiPlanProposalProvider:

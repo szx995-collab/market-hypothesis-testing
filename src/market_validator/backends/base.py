@@ -3,11 +3,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from enum import StrEnum
 from typing import Any, Mapping, Protocol, runtime_checkable
 
 
 class BackendNotImplementedError(RuntimeError):
     """Raised when a configured backend has no invocation implementation yet."""
+
+
+class StructuredGenerationErrorCode(StrEnum):
+    """Stable, provider-neutral failure categories for one generation request."""
+
+    CONFIGURATION_MISSING = "provider_configuration_missing"
+    REQUEST_FAILED = "provider_request_failed"
+    TIMEOUT = "provider_timeout"
+    REFUSED = "provider_refused"
+    INVALID_RESPONSE = "provider_invalid_proposal"
+
+
+class StructuredGenerationBackendError(RuntimeError):
+    """Sanitized backend failure that never includes credentials or raw bodies."""
+
+    def __init__(self, code: StructuredGenerationErrorCode, message: str) -> None:
+        self.code = code
+        self.safe_message = message
+        super().__init__(f"{code.value}: {message}")
 
 
 @dataclass(frozen=True, slots=True)

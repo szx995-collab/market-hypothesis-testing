@@ -2,8 +2,11 @@
 
 The CLI is a stable, script-oriented wrapper around the existing deterministic
 workflow, strict artifact loader, and optional proposal-only AI adapter. It does
-not implement analysis itself. All commands are offline except the explicitly
-authorized `propose-plan --allow-network` request.
+not implement analysis itself. Commands are offline by default. Network access
+requires an existing explicit boundary: FRED uses `--live`, while AI proposal
+generation uses `propose-plan --allow-network` or
+`propose-hypothesis --allow-network`. Each AI invocation permits at most one
+provider request with no retry.
 
 ## Installation and equivalent entry points
 
@@ -23,8 +26,45 @@ python -m market_validator --help
 No input path is inferred from the current directory or environment variables.
 Every question, provider, model, proposal output, plan, Bundle, artifact root,
 artifact directory, and external Manifest hash required by a command must be
-explicit. Omitting `--allow-network` from `propose-plan` returns exit code 2
-before provider construction.
+explicit. Omitting `--allow-network` from either proposal-generation command
+returns exit code 2 before provider construction.
+
+## General hypothesis draft commands
+
+Export the strict proposal JSON Schema offline:
+
+```powershell
+market-validator hypothesis schema
+```
+
+Validate and summarize an untrusted draft without confirming, compiling, or
+executing it:
+
+```powershell
+market-validator hypothesis validate-proposal `
+  examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
+```
+
+The summary includes the canonical proposal SHA-256, claim type, method,
+readiness, ambiguities, and unsupported requests. A structurally valid proposal
+may correctly have `ready_for_spec_review=false`.
+
+The only hypothesis command that may call a model is explicit and create-only:
+
+```powershell
+market-validator propose-hypothesis `
+  --question-file examples/hypothesis_proposals/oil_to_a_share_energy.question.txt `
+  --provider deepseek_api `
+  --model <explicit-current-model> `
+  --output <new-proposal.json> `
+  --allow-network
+```
+
+The output path must not already exist. Output conflict, missing Key, missing
+network permission, unsafe path, or invalid provider output fails without a
+partial file. The command creates no confirmation, ResearchSpec, plan, Bundle,
+analysis, report, or artifact. It is separate from the fixed WTI workflow
+proposal described below.
 
 ## Proposal and plan examples
 
@@ -175,6 +215,11 @@ uses exit code 0.
 | 22 | `provider_invalid_proposal` |
 | 23 | `proposal_output_conflict` |
 | 24 | `proposal_output_error` |
+| 25 | `invalid_hypothesis_proposal` |
+| 26 | `hypothesis_backend_unavailable` |
+| 27 | `hypothesis_backend_identity_mismatch` |
+| 28 | `hypothesis_output_conflict` |
+| 29 | `hypothesis_output_error` |
 
 ## Trust and responsibility boundary
 
@@ -196,10 +241,12 @@ natural-language question
 → user makes the final judgment
 ```
 
-The CLI can explicitly ask the optional AI adapter for proposal text, validate
-a preconstructed proposal, and compile an explicitly confirmed proposal against
-an existing local Bundle. Only `propose-plan --allow-network` may call a model;
-only the separate `run` command executes the existing
+The CLI can explicitly ask the optional AI adapter for either a generic
+hypothesis draft or fixed WTI workflow proposal, validate a preconstructed
+proposal, and compile only the explicitly confirmed fixed workflow proposal
+against an existing local Bundle. Only `propose-plan --allow-network` and
+`propose-hypothesis --allow-network` may call a model; only the separate `run`
+command executes the existing
 `price_change_volatility` workflow. The AI provider is not a data source,
 statistical engine, confirmer, compiler, or executor. The CLI does not contact
 FRED, automatically confirm or execute a proposal, run generic analysis,

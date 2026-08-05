@@ -4,6 +4,8 @@ from market_validator.backends.base import (
     BackendNotImplementedError,
     BackendStatus,
     StructuredGenerationBackend,
+    StructuredGenerationBackendError,
+    StructuredGenerationErrorCode,
     StructuredGenerationRequest,
     StructuredGenerationResult,
 )
@@ -16,6 +18,8 @@ __all__ = [
     "CodexPlusBackend",
     "DeepSeekApiBackend",
     "StructuredGenerationBackend",
+    "StructuredGenerationBackendError",
+    "StructuredGenerationErrorCode",
     "StructuredGenerationRequest",
     "StructuredGenerationResult",
 ]

@@ -18,6 +18,10 @@ from market_validator.backends.config import (
 )
 from market_validator.backends.deepseek_api import DeepSeekApiBackend
 from market_validator.data.cli import add_data_parser, handle_data_command
+from market_validator.hypothesis_cli import (
+    add_hypothesis_parsers,
+    handle_hypothesis_cli_command,
+)
 from market_validator.research.models import ResearchSpec
 from market_validator.workflow_cli import (
     WorkflowCliExitCode,
@@ -47,6 +51,7 @@ def _build_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument("path", type=Path)
     add_data_parser(subparsers)
     add_workflow_parsers(subparsers)
+    add_hypothesis_parsers(subparsers)
     return parser
 
 
@@ -164,5 +169,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "verify-artifact",
     }:
         return handle_workflow_cli_command(args)
+
+    if args.command in {"hypothesis", "propose-hypothesis"}:
+        return handle_hypothesis_cli_command(args)
 
     return 2

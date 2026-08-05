@@ -1,0 +1,81 @@
+{
+  "alignment": {
+    "information_cutoff": null,
+    "market_relation": "cross_market",
+    "target_calendar": null,
+    "target_market": "中国 A 股市场",
+    "target_session": "regular_session",
+    "target_timezone": "Asia/Shanghai"
+  },
+  "ambiguities": [
+    "需要明确研究样本的开始日期和结束日期。",
+    "需要明确国际油价采用现货还是连续期货；若为连续期货，还需明确换月规则。",
+    "需要明确油价和能源板块日收益率使用简单收益率还是对数收益率。",
+    "需要明确能源板块采用正式行业指数还是 ETF 代理及其定义。",
+    "需要明确目标交易日历和 A 股目标时段前的信息截止点。",
+    "需要明确是否使用控制变量。",
+    "需要明确显著性水平和最小效应阈值。"
+  ],
+  "assumptions": [
+    "题目中的“下一个可交易 A 股交易日”表示油价信息应先于结果时段可得。"
+  ],
+  "claim_type": "predictive",
+  "controls": [],
+  "normalized_research_question": "国际油价日收益率是否与下一个可交易 A 股交易日的能源板块收益率存在正向预测关系？",
+  "original_question": "国际油价日收益率是否正向预测下一个可交易 A 股交易日的能源板块收益率？",
+  "outcome": {
+    "asset_type": null,
+    "concept_name": "A 股能源板块日收益率",
+    "contract_roll_method": null,
+    "market_context": "中国 A 股能源板块",
+    "proxy_for": null,
+    "role": "outcome",
+    "time_relation": {
+      "available_before_outcome": null,
+      "description": "下一个可交易 A 股交易日的目标交易时段",
+      "lag_periods": null,
+      "relation": "outcome_period"
+    },
+    "transformation": null,
+    "variable_id": "a_share_energy_return"
+  },
+  "predictors": [
+    {
+      "asset_type": null,
+      "concept_name": "国际油价日收益率",
+      "contract_roll_method": null,
+      "market_context": "国际原油市场",
+      "proxy_for": null,
+      "role": "predictor",
+      "time_relation": {
+        "available_before_outcome": true,
+        "description": "在下一个可交易 A 股目标时段之前可得",
+        "lag_periods": 1,
+        "relation": "precedes_outcome"
+      },
+      "transformation": null,
+      "variable_id": "international_oil_return"
+    }
+  ],
+  "proposal_schema_version": "1.0",
+  "ready_for_spec_review": false,
+  "sample": {
+    "end_date": null,
+    "frequency": "1d",
+    "start_date": null
+  },
+  "statistical_hypothesis": {
+    "alternative_hypothesis": "H1: beta > 0",
+    "direction": "positive",
+    "minimum_effect_size": null,
+    "null_hypothesis": "H0: beta <= 0",
+    "significance_level": null,
+    "statistical_method": "lead_lag_regression",
+    "target_parameter": {
+      "kind": "regression_coefficient",
+      "predictor_variable_id": "international_oil_return",
+      "reference_value": 0
+    }
+  },
+  "unsupported_requests": []
+}
