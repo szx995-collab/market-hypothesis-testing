@@ -46,8 +46,57 @@ market-validator hypothesis validate-proposal `
 ```
 
 The summary includes the canonical proposal SHA-256, claim type, method,
-readiness, ambiguities, and unsupported requests. A structurally valid proposal
-may correctly have `ready_for_spec_review=false`.
+readiness, stable ambiguity references, and unsupported requests. A
+structurally valid proposal may correctly have `ready_for_spec_review=false`.
+
+Review and apply explicit structured answers entirely offline:
+
+```powershell
+market-validator hypothesis clarification-schema
+market-validator hypothesis validate-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json>
+market-validator hypothesis apply-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json> `
+  --output <new-clarified-proposal.json>
+```
+
+`apply-clarifications` never changes the source proposal. Partial answers are
+valid but remain not ready. Unknown IDs, conflicting changes, and unsupported
+request laundering fail with stable nonzero codes.
+
+Explicit confirmation and ResearchSpec compilation are separate commands:
+
+```powershell
+market-validator hypothesis confirmation-schema
+market-validator hypothesis confirm-proposal `
+  --proposal <ready-proposal.json> `
+  --output <confirmation.json>
+market-validator hypothesis compile-research-spec `
+  --proposal <ready-proposal.json> `
+  --confirmation <confirmation.json> `
+  --output <research-spec.json>
+```
+
+Confirmation binds the exact canonical proposal SHA-256. Compilation writes the
+existing strict ResearchSpec plus `<research-spec.json>.provenance.json`; it
+does not select a provider, download data, compile a workflow, or execute
+statistics. Missing mandatory mappings return machine-readable
+`unresolved_requirements` and write no spec.
+
+`ready_for_spec_review=true` is a Proposal-layer statement: the Proposal is
+reviewable and confirmable, but compilation may still return
+`unresolved_requirements` when existing ResearchSpec mappings are absent or
+inexpressible — for example a `follows_outcome` relation that cannot be
+represented as a non-negative lag. Such relations are rejected, never guessed
+or converted. Re-running `confirm-proposal` for the same proposal writes a new
+audit timestamp and therefore conflicts with an existing immutable
+confirmation file instead of overwriting it. Proposal hash identity includes
+whether default-valued fields were explicitly provided; explicitly adding or
+removing such fields changes the hash and invalidates an older confirmation.
+A confirmation is a consistency binding and audit record, not identity
+authentication.
 
 The only hypothesis command that may call a model is explicit and create-only:
 
@@ -220,6 +269,16 @@ uses exit code 0.
 | 27 | `hypothesis_backend_identity_mismatch` |
 | 28 | `hypothesis_output_conflict` |
 | 29 | `hypothesis_output_error` |
+| 30 | `invalid_hypothesis_clarifications` |
+| 31 | `hypothesis_clarification_mismatch` |
+| 32 | `hypothesis_clarification_conflict` |
+| 33 | `hypothesis_proposal_not_ready` |
+| 34 | `invalid_hypothesis_confirmation` |
+| 35 | `hypothesis_confirmation_mismatch` |
+| 36 | `research_spec_unresolved` |
+| 37 | `research_spec_invalid` |
+| 38 | `hypothesis_review_output_conflict` |
+| 39 | `hypothesis_review_output_error` |
 
 ## Trust and responsibility boundary
 

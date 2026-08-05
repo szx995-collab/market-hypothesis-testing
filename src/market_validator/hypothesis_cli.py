@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import os
 from pathlib import Path
 import stat
@@ -13,11 +14,26 @@ from market_validator.backends.base import (
 )
 from market_validator.backends.deepseek_api import DeepSeekApiBackend
 from market_validator.hypothesis import (
+    ClarificationAnswers,
+    HypothesisLifecycleError,
+    HypothesisLifecycleErrorCode,
     HypothesisProposalError,
     HypothesisProposalService,
+    ResearchHypothesisProposal,
+    apply_clarification_answers,
     calculate_research_hypothesis_proposal_sha256,
+    clarification_answers_json_schema,
+    compile_confirmed_research_spec,
+    confirm_research_hypothesis_proposal,
+    confirmation_json_schema,
+    parse_clarification_answers,
+    parse_research_hypothesis_confirmation,
     parse_research_hypothesis_proposal,
+    persist_clarified_proposal,
+    persist_compiled_research_spec,
     persist_generated_research_hypothesis_proposal,
+    persist_research_hypothesis_confirmation,
+    proposal_ambiguity_references,
     research_hypothesis_proposal_json_schema,
     validate_hypothesis_proposal_output_path,
 )
@@ -61,6 +77,39 @@ BACKEND_ERROR_EXIT_CODES = {
     ),
 }
 
+HYPOTHESIS_LIFECYCLE_ERROR_EXIT_CODES = {
+    HypothesisLifecycleErrorCode.INVALID_CLARIFICATIONS: (
+        WorkflowCliExitCode.INVALID_HYPOTHESIS_CLARIFICATIONS
+    ),
+    HypothesisLifecycleErrorCode.CLARIFICATION_MISMATCH: (
+        WorkflowCliExitCode.HYPOTHESIS_CLARIFICATION_MISMATCH
+    ),
+    HypothesisLifecycleErrorCode.CLARIFICATION_CONFLICT: (
+        WorkflowCliExitCode.HYPOTHESIS_CLARIFICATION_CONFLICT
+    ),
+    HypothesisLifecycleErrorCode.PROPOSAL_NOT_READY: (
+        WorkflowCliExitCode.HYPOTHESIS_PROPOSAL_NOT_READY
+    ),
+    HypothesisLifecycleErrorCode.INVALID_CONFIRMATION: (
+        WorkflowCliExitCode.INVALID_HYPOTHESIS_CONFIRMATION
+    ),
+    HypothesisLifecycleErrorCode.CONFIRMATION_MISMATCH: (
+        WorkflowCliExitCode.HYPOTHESIS_CONFIRMATION_MISMATCH
+    ),
+    HypothesisLifecycleErrorCode.RESEARCH_SPEC_UNRESOLVED: (
+        WorkflowCliExitCode.RESEARCH_SPEC_UNRESOLVED
+    ),
+    HypothesisLifecycleErrorCode.RESEARCH_SPEC_INVALID: (
+        WorkflowCliExitCode.RESEARCH_SPEC_INVALID
+    ),
+    HypothesisLifecycleErrorCode.OUTPUT_CONFLICT: (
+        WorkflowCliExitCode.HYPOTHESIS_REVIEW_OUTPUT_CONFLICT
+    ),
+    HypothesisLifecycleErrorCode.OUTPUT_ERROR: (
+        WorkflowCliExitCode.HYPOTHESIS_REVIEW_OUTPUT_ERROR
+    ),
+}
+
 
 class HypothesisCliInputError(ValueError):
     def __init__(self, message: str, stage: str) -> None:
@@ -81,6 +130,41 @@ def add_hypothesis_parsers(subparsers: argparse._SubParsersAction) -> None:
         help="strictly validate and summarize a proposal without confirming it",
     )
     validate.add_argument("proposal", type=Path)
+
+    commands.add_parser(
+        "clarification-schema",
+        help="print the strict clarification-answer JSON Schema",
+    )
+    validate_clarifications = commands.add_parser(
+        "validate-clarifications",
+        help="validate and apply clarifications in memory without writing output",
+    )
+    validate_clarifications.add_argument("--proposal", required=True, type=Path)
+    validate_clarifications.add_argument("--answers", required=True, type=Path)
+    apply_clarifications = commands.add_parser(
+        "apply-clarifications",
+        help="apply whitelisted answers and create a new canonical proposal",
+    )
+    apply_clarifications.add_argument("--proposal", required=True, type=Path)
+    apply_clarifications.add_argument("--answers", required=True, type=Path)
+    apply_clarifications.add_argument("--output", required=True, type=Path)
+    commands.add_parser(
+        "confirmation-schema",
+        help="print the strict explicit-confirmation JSON Schema",
+    )
+    confirm = commands.add_parser(
+        "confirm-proposal",
+        help="explicitly confirm one exact ready proposal without executing it",
+    )
+    confirm.add_argument("--proposal", required=True, type=Path)
+    confirm.add_argument("--output", required=True, type=Path)
+    compile_spec = commands.add_parser(
+        "compile-research-spec",
+        help="compile a confirmed proposal into the existing ResearchSpec contract",
+    )
+    compile_spec.add_argument("--proposal", required=True, type=Path)
+    compile_spec.add_argument("--confirmation", required=True, type=Path)
+    compile_spec.add_argument("--output", required=True, type=Path)
 
     propose = subparsers.add_parser(
         "propose-hypothesis",
@@ -163,9 +247,99 @@ def _handle_validate(args: argparse.Namespace) -> int:
             ),
             "ready_for_spec_review": proposal.ready_for_spec_review,
             "ambiguities": proposal.ambiguities,
+            "ambiguity_references": [
+                item.model_dump(mode="json")
+                for item in proposal_ambiguity_references(proposal)
+            ],
             "unsupported_requests": proposal.unsupported_requests,
         }
     )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _load_proposal(path: Path) -> ResearchHypothesisProposal:
+    return parse_research_hypothesis_proposal(
+        _read_regular_utf8(path, label="hypothesis_proposal")
+    )
+
+
+def _load_clarifications(path: Path) -> ClarificationAnswers:
+    return parse_clarification_answers(
+        _read_regular_utf8(path, label="hypothesis_clarifications")
+    )
+
+
+def _handle_clarification_schema() -> int:
+    emit_success(clarification_answers_json_schema())
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_validate_clarifications(args: argparse.Namespace) -> int:
+    proposal = _load_proposal(args.proposal)
+    answers = _load_clarifications(args.answers)
+    applied = apply_clarification_answers(proposal, answers)
+    emit_success(
+        {
+            "source_proposal_sha256": applied.source_proposal_sha256,
+            "clarified_proposal_sha256": applied.clarified_proposal_sha256,
+            "answered_ambiguity_ids": applied.answered_ambiguity_ids,
+            "remaining_ambiguities": applied.remaining_ambiguities,
+            "ready_for_spec_review": applied.proposal.ready_for_spec_review,
+        }
+    )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_apply_clarifications(args: argparse.Namespace) -> int:
+    applied = apply_clarification_answers(
+        _load_proposal(args.proposal),
+        _load_clarifications(args.answers),
+    )
+    output_path = persist_clarified_proposal(applied, args.output)
+    emit_success(
+        {
+            "output_path": str(output_path),
+            "proposal_sha256": applied.clarified_proposal_sha256,
+            "ready_for_spec_review": applied.proposal.ready_for_spec_review,
+            "remaining_ambiguities": applied.remaining_ambiguities,
+        }
+    )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_confirmation_schema() -> int:
+    emit_success(confirmation_json_schema())
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_confirm(args: argparse.Namespace) -> int:
+    proposal = _load_proposal(args.proposal)
+    confirmation = confirm_research_hypothesis_proposal(
+        proposal,
+        confirmed_at=datetime.now(timezone.utc),
+    )
+    output_path = persist_research_hypothesis_confirmation(
+        confirmation,
+        args.output,
+    )
+    emit_success(
+        {
+            "output_path": str(output_path),
+            "proposal_sha256": confirmation.proposal_sha256,
+            "confirmed": confirmation.confirmed,
+        }
+    )
+    return int(WorkflowCliExitCode.SUCCESS)
+
+
+def _handle_compile_research_spec(args: argparse.Namespace) -> int:
+    proposal = _load_proposal(args.proposal)
+    confirmation = parse_research_hypothesis_confirmation(
+        _read_regular_utf8(args.confirmation, label="hypothesis_confirmation")
+    )
+    compiled = compile_confirmed_research_spec(proposal, confirmation)
+    persisted = persist_compiled_research_spec(compiled, args.output)
+    emit_success(persisted.model_dump(mode="json"))
     return int(WorkflowCliExitCode.SUCCESS)
 
 
@@ -203,6 +377,18 @@ def handle_hypothesis_cli_command(args: argparse.Namespace) -> int:
                 return _handle_schema()
             if args.hypothesis_command == "validate-proposal":
                 return _handle_validate(args)
+            if args.hypothesis_command == "clarification-schema":
+                return _handle_clarification_schema()
+            if args.hypothesis_command == "validate-clarifications":
+                return _handle_validate_clarifications(args)
+            if args.hypothesis_command == "apply-clarifications":
+                return _handle_apply_clarifications(args)
+            if args.hypothesis_command == "confirmation-schema":
+                return _handle_confirmation_schema()
+            if args.hypothesis_command == "confirm-proposal":
+                return _handle_confirm(args)
+            if args.hypothesis_command == "compile-research-spec":
+                return _handle_compile_research_spec(args)
         if args.command == "propose-hypothesis":
             return _handle_propose(args)
     except HypothesisCliInputError as exc:
@@ -212,6 +398,23 @@ def handle_hypothesis_cli_command(args: argparse.Namespace) -> int:
         failure = exc.failure
         emit_error(failure.code.value, failure.message, failure.stage.value)
         return int(HYPOTHESIS_ERROR_EXIT_CODES[failure.code])
+    except HypothesisLifecycleError as exc:
+        failure = exc.failure
+        details = None
+        if failure.unresolved_requirements:
+            details = {
+                "unresolved_requirements": [
+                    item.model_dump(mode="json")
+                    for item in failure.unresolved_requirements
+                ]
+            }
+        emit_error(
+            failure.code.value,
+            failure.message,
+            failure.stage.value,
+            details=details,
+        )
+        return int(HYPOTHESIS_LIFECYCLE_ERROR_EXIT_CODES[failure.code])
     except StructuredGenerationBackendError as exc:
         emit_error(exc.code.value, exc.safe_message, "hypothesis_backend_generation")
         return int(BACKEND_ERROR_EXIT_CODES[exc.code])
@@ -229,6 +432,7 @@ def handle_hypothesis_cli_command(args: argparse.Namespace) -> int:
 __all__ = [
     "BACKEND_ERROR_EXIT_CODES",
     "HYPOTHESIS_ERROR_EXIT_CODES",
+    "HYPOTHESIS_LIFECYCLE_ERROR_EXIT_CODES",
     "add_hypothesis_parsers",
     "handle_hypothesis_cli_command",
 ]

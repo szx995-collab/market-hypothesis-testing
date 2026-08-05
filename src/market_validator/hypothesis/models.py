@@ -16,13 +16,20 @@ from market_validator.research.enums import (
     ContractRollMethod,
     Direction,
     Frequency,
+    JoinPolicy,
+    MissingDataPolicy,
     ModelMethod,
+    MultipleTestingCorrection,
+    PriceAdjustment,
     TargetSession,
     Transformation,
     VariableRole,
 )
 from market_validator.research.models import (
+    DataRevisionSpec,
     InformationCutoffSpec,
+    InstrumentSpec,
+    RobustnessCheckSpec,
     StrictResearchModel,
 )
 from market_validator.research.validation import validate_iana_timezone
@@ -229,6 +236,52 @@ class StatisticalHypothesisSpec(StrictResearchModel):
         return self
 
 
+class ResearchSpecVariableInputs(StrictResearchModel):
+    """Only the provider-neutral variable fields absent from the proposal draft."""
+
+    variable_id: Identifier
+    instrument: InstrumentSpec
+    field: NonEmptyText
+    availability_lag_periods: Annotated[int, Field(ge=0)]
+    price_adjustment: PriceAdjustment | None
+    rolling_window_periods: Annotated[int, Field(gt=0)] | None
+    revision_policy: DataRevisionSpec = Field(default_factory=DataRevisionSpec)
+
+
+class ResearchSpecCompilationInputs(StrictResearchModel):
+    """Explicit values required to compile, without duplicating proposal fields."""
+
+    spec_id: Identifier
+    title: NonEmptyText
+    variables: list[ResearchSpecVariableInputs] = Field(min_length=2)
+    minimum_observations: Annotated[int, Field(gt=0)]
+    join_policy: JoinPolicy | None
+    max_staleness_days: Annotated[int, Field(ge=0)] | None
+    missing_data_policy: MissingDataPolicy | None
+    multiple_testing_correction: MultipleTestingCorrection
+    robustness_checks: list[RobustnessCheckSpec]
+    limitations: list[NonEmptyText]
+
+    @model_validator(mode="after")
+    def validate_variable_ids(self) -> Self:
+        variable_ids = [item.variable_id for item in self.variables]
+        if len(variable_ids) != len(set(variable_ids)):
+            raise ValueError("research_spec_inputs variable_id values must be unique")
+        alignment_values = (
+            self.join_policy,
+            self.max_staleness_days,
+            self.missing_data_policy,
+        )
+        if any(value is None for value in alignment_values) and any(
+            value is not None for value in alignment_values
+        ):
+            raise ValueError(
+                "join_policy, max_staleness_days, and missing_data_policy "
+                "must be supplied together"
+            )
+        return self
+
+
 _FORBIDDEN_GENERATED_TEXT = re.compile(
     r"(?:```|https?://|[A-Za-z]:[\\/]|(?:^|\s)/(?:home|Users|tmp|var|etc)/|"
     r"\b(?:api[_ -]?key|authorization|bearer|password|secret|access[_ -]?token)\b|"
@@ -326,6 +379,18 @@ def _generated_text_values(proposal: "ResearchHypothesisProposal") -> list[str]:
     values.extend(proposal.assumptions)
     values.extend(proposal.ambiguities)
     values.extend(proposal.unsupported_requests)
+    if proposal.research_spec_inputs is not None:
+        stack: list[object] = [
+            proposal.research_spec_inputs.model_dump(mode="json")
+        ]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, str):
+                values.append(item)
+            elif isinstance(item, dict):
+                stack.extend(item.values())
+            elif isinstance(item, list):
+                stack.extend(item)
     return values
 
 
@@ -346,6 +411,67 @@ class ResearchHypothesisProposal(StrictResearchModel):
     ambiguities: list[NonEmptyText]
     unsupported_requests: list[NonEmptyText]
     ready_for_spec_review: bool
+    research_spec_inputs: ResearchSpecCompilationInputs | None = None
+
+    def readiness_blockers(self) -> list[str]:
+        """Return deterministic incompleteness reasons independent of review text."""
+
+        variables = [self.outcome, *self.predictors, *self.controls]
+        statistical = self.statistical_hypothesis
+        blockers: list[str] = []
+        if any(item.transformation is None for item in variables):
+            blockers.append("variable transformation")
+        if self.sample.start_date is None or self.sample.end_date is None:
+            blockers.append("sample date range")
+        if self.sample.frequency is None:
+            blockers.append("sample frequency")
+        if self.alignment.market_relation is DraftMarketRelation.UNSPECIFIED:
+            blockers.append("market relation")
+        if (
+            self.alignment.market_relation is DraftMarketRelation.CROSS_MARKET
+            and not self.alignment.is_complete_for_cross_market()
+        ):
+            blockers.append("cross-market alignment and information cutoff")
+        if statistical.statistical_method is None:
+            blockers.append("statistical method")
+        if statistical.direction is None:
+            blockers.append("test direction")
+        if statistical.significance_level is None:
+            blockers.append("significance level")
+        if statistical.minimum_effect_size is None:
+            blockers.append("minimum effect size")
+
+        model_inputs = [*self.predictors, *self.controls]
+        if self.claim_type is ClaimType.PREDICTIVE:
+            for variable in model_inputs:
+                timing = variable.time_relation
+                if (
+                    timing.relation is not DraftTimeRelation.PRECEDES_OUTCOME
+                    or timing.available_before_outcome is not True
+                    or timing.lag_periods is None
+                ):
+                    blockers.append(
+                        f"predictive input {variable.variable_id} "
+                        "availability before outcome"
+                    )
+        elif self.claim_type is ClaimType.ASSOCIATION:
+            for variable in variables:
+                if variable.time_relation.relation is DraftTimeRelation.UNSPECIFIED:
+                    blockers.append(
+                        f"association variable {variable.variable_id} time relation"
+                    )
+                if (
+                    variable.time_relation.relation
+                    in {
+                        DraftTimeRelation.PRECEDES_OUTCOME,
+                        DraftTimeRelation.FOLLOWS_OUTCOME,
+                    }
+                    and variable.time_relation.lag_periods is None
+                ):
+                    blockers.append(
+                        f"association variable {variable.variable_id} lag periods"
+                    )
+        return blockers
 
     @model_validator(mode="after")
     def validate_proposal_contract(self) -> Self:
@@ -383,46 +509,7 @@ class ResearchHypothesisProposal(StrictResearchModel):
                 "regression methods require target kind=regression_coefficient"
             )
 
-        incomplete: list[str] = []
-        if any(item.transformation is None for item in variables):
-            incomplete.append("variable transformation")
-        if self.sample.start_date is None or self.sample.end_date is None:
-            incomplete.append("sample date range")
-        if self.sample.frequency is None:
-            incomplete.append("sample frequency")
-        if self.alignment.market_relation is DraftMarketRelation.UNSPECIFIED:
-            incomplete.append("market relation")
-        if (
-            self.alignment.market_relation is DraftMarketRelation.CROSS_MARKET
-            and not self.alignment.is_complete_for_cross_market()
-        ):
-            incomplete.append("cross-market alignment and information cutoff")
-        if statistical.statistical_method is None:
-            incomplete.append("statistical method")
-        if statistical.direction is None:
-            incomplete.append("test direction")
-        if statistical.significance_level is None:
-            incomplete.append("significance level")
-        if statistical.minimum_effect_size is None:
-            incomplete.append("minimum effect size")
-
-        model_inputs = [*self.predictors, *self.controls]
-        if self.claim_type is ClaimType.PREDICTIVE:
-            for variable in model_inputs:
-                timing = variable.time_relation
-                if (
-                    timing.relation is not DraftTimeRelation.PRECEDES_OUTCOME
-                    or timing.available_before_outcome is not True
-                ):
-                    incomplete.append(
-                        f"predictive input {variable.variable_id} availability before outcome"
-                    )
-        elif self.claim_type is ClaimType.ASSOCIATION:
-            for variable in variables:
-                if variable.time_relation.relation is DraftTimeRelation.UNSPECIFIED:
-                    incomplete.append(
-                        f"association variable {variable.variable_id} time relation"
-                    )
+        incomplete = self.readiness_blockers()
 
         original_casefold = self.original_question.casefold()
         unsupported_casefold = " ".join(self.unsupported_requests).casefold()
@@ -510,6 +597,8 @@ __all__ = [
     "HypothesisTimeRelationDraft",
     "HypothesisVariableDraft",
     "ResearchHypothesisProposal",
+    "ResearchSpecCompilationInputs",
+    "ResearchSpecVariableInputs",
     "StatisticalHypothesisSpec",
     "TargetParameterKind",
     "TargetParameterSpec",

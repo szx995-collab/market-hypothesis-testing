@@ -24,8 +24,10 @@ The system never places trades. It does not describe association, retrospective 
 User market question
 → optional AI Provider creates an untrusted proposal
 → strict parser validates and canonicalizes it
-→ user reviews and confirms the proposal SHA-256
-→ compile-plan deterministically binds an explicit Bundle
+→ deterministic clarification applies only explicit whitelisted answers
+→ user reviews and explicitly confirms the exact proposal SHA-256
+→ Python deterministically compiles the confirmed proposal to ResearchSpec
+→ a later, separately authorized data/workflow stage may use the ResearchSpec
 → user separately invokes run
 → deterministic transformation, analysis, atomic publication, and strict reload
 → AI may explain only the verified result
@@ -34,7 +36,7 @@ User market question
 
 The optional AI Provider receives only the original question, a fixed system prompt, the proposal JSON Schema, and the supported-capability description. It never receives a Bundle, local path, request ID, hash, artifact identity, or credential. Model generation is nondeterministic; only canonical proposal bytes and their SHA-256 are reproducible. Every changed proposal requires fresh review and confirmation.
 
-The hash-confirm/compile/run flow above currently applies only to the fixed WTI workflow proposal. A generic `ResearchHypothesisProposal` stops after strict validation and user clarification; its confirmation and ResearchSpec compiler are future work.
+The generic `ResearchHypothesisProposal` path now supports clarification, hash-bound confirmation, and deterministic compilation into the existing `ResearchSpec` model. It does not bind a data provider, download data, or run analysis. The separate fixed WTI `MarketValidationPlanProposal` path still owns Bundle binding and the only implemented end-to-end analysis workflow.
 
 `--allow-network` authorizes one proposal-generation network request only. It is not confirmation and does not authorize `compile-plan`, `run`, data downloads, or artifact publication. Provider names, models, and availability may change; verify current official documentation before making a real request.
 
@@ -49,8 +51,9 @@ The hash-confirm/compile/run flow above currently applies only to the fixed WTI 
 - Deterministic analysis artifacts, Manifest validation, strict reload, workflow, and offline CLI.
 - An optional proposal-only DeepSeek adapter with bounded requests and no automatic retries.
 - A strict, provider-neutral `ResearchHypothesisProposal` for general natural-language association/predictive questions, deterministic H0/H1 validation, explicit ambiguities, Schema, canonical JSON, SHA-256, and safe create-only output.
+- Stable ambiguity IDs, strict whitelisted clarification answers, explicit hash-bound user confirmation, and deterministic compilation to the existing `ResearchSpec` with an auditable provenance sidecar.
 
-Not implemented: converting a confirmed generic hypothesis proposal into ResearchSpec, automatic provider selection, online market-data workflows, general cross-market calendar alignment, generic correlation/regression/causal execution, backtesting, automatic confirmation/execution, or trading.
+Not implemented: automatic provider selection, online market-data workflows, general cross-market calendar alignment execution, generic correlation/regression/causal execution, backtesting, automatic confirmation/execution, or trading.
 
 ### Quick start
 
@@ -61,6 +64,8 @@ market-validator doctor
 python -m market_validator backends
 python -m market_validator hypothesis schema
 python -m market_validator hypothesis validate-proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
+python -m market_validator hypothesis clarification-schema
+python -m market_validator hypothesis validate-clarifications --proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json --answers examples/hypothesis_proposals/oil_to_a_share_energy.clarifications.json
 python -m unittest discover -s tests
 ```
 
@@ -94,7 +99,23 @@ python -m market_validator propose-hypothesis `
   --allow-network
 ```
 
-This generic draft command identifies variables, timing, method, direction, deterministic H0/H1, and unresolved choices. It does not confirm the draft or build ResearchSpec. The older fixed-capability workflow proposal remains separate:
+This generic draft command identifies variables, timing, method, direction, deterministic H0/H1, and unresolved choices. Separate offline commands apply explicit clarifications, create a user confirmation record, and compile only a fully mapped proposal to `ResearchSpec`; none downloads data or runs analysis. The older fixed-capability workflow proposal remains separate:
+
+```powershell
+python -m market_validator hypothesis apply-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json> `
+  --output <clarified-proposal.json>
+python -m market_validator hypothesis confirm-proposal `
+  --proposal <clarified-proposal.json> `
+  --output <confirmation.json>
+python -m market_validator hypothesis compile-research-spec `
+  --proposal <clarified-proposal.json> `
+  --confirmation <confirmation.json> `
+  --output <research-spec.json>
+```
+
+Ready is not Confirmed, and Confirmed is not executed. Any effective proposal change invalidates the old confirmation hash. Missing existing ResearchSpec fields produce structured unresolved requirements rather than guessed defaults.
 
 ```powershell
 python -m market_validator propose-plan `
@@ -163,6 +184,7 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 - 确定性分析 artifact、Manifest、严格回读和统一 workflow。
 - 可选、proposal-only 的 DeepSeek AI Provider。
 - 独立、严格的通用 `ResearchHypothesisProposal`：表达 association/predictive 问题、变量角色、变换、时间方向、方法、目标参数、确定性 H0/H1、歧义和不支持请求。
+- 稳定 ambiguity ID、白名单结构化澄清、绑定规范化 Proposal SHA-256 的显式确认，以及生成现有 `ResearchSpec` 和 provenance sidecar 的确定性编译器。
 
 ## 架构与信任边界
 
@@ -170,10 +192,10 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 用户市场问题
 → 可选 AI Provider 生成不可信 proposal
 → 现有严格解析器验证并规范化
-→ 用户审阅并确认 proposal SHA-256
-→ compile-plan 确定性绑定显式 Bundle
-→ 生成严格 WorkflowPlan 后停止
-→ 用户单独执行 run
+→ Python 只应用用户给出的白名单结构化澄清
+→ 用户审阅并显式确认精确的 proposal SHA-256
+→ Python 确定性生成并严格验证 ResearchSpec
+→ 后续数据或 workflow 阶段必须另行授权
 → 转换、分析、原子发布、Manifest 锚定和严格回读
 → AI 只能解释已验证结果
 → 用户作最终判断
@@ -185,7 +207,7 @@ AI Provider 只接收原始问题、固定 system prompt、proposal JSON Schema 
 
 模型生成本身不确定。只有经过严格解析后的规范化 proposal 字节及其 SHA-256 可复现；生成内容只要变化，就必须重新审阅和确认。
 
-上述哈希确认、编译和运行链目前只适用于固定 WTI workflow proposal。通用 `ResearchHypothesisProposal` 本轮只到严格验证和用户澄清；确认协议及 ResearchSpec 编译器尚未实现。
+通用 `ResearchHypothesisProposal` 现在支持结构化澄清、哈希绑定确认和确定性 ResearchSpec 编译，但不会绑定真实数据源、下载数据或执行分析。固定 WTI `MarketValidationPlanProposal` 仍是独立契约，也是当前唯一已实现的端到端分析 workflow。
 
 ### 网络授权
 
@@ -216,6 +238,8 @@ python -m market_validator spec schema
 python -m market_validator spec validate examples/research_specs/oil_to_a_share_energy.json
 python -m market_validator hypothesis schema
 python -m market_validator hypothesis validate-proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json
+python -m market_validator hypothesis clarification-schema
+python -m market_validator hypothesis validate-clarifications --proposal examples/hypothesis_proposals/oil_to_a_share_energy.proposal.json --answers examples/hypothesis_proposals/oil_to_a_share_energy.clarifications.json
 python -m market_validator data registry validate
 python -m market_validator data fred fetch examples/data_requirements/fred_wti_spot_initial.json
 python -m market_validator validate-proposal examples/ai_planning/wti_price_change_volatility.proposal.json
@@ -239,7 +263,7 @@ python -m market_validator propose-hypothesis `
   --allow-network
 ```
 
-该命令只识别研究变量、角色、变换、时间方向、方法、检验方向和歧义。Python 严格验证目标参数及 H0/H1，并保存规范化 JSON 与 SHA-256。它不确认草案、不构建 ResearchSpec、不获取数据也不执行统计。
+该命令只生成不可信草案。后续离线命令可应用用户明确给出的结构化澄清、创建绑定规范化 SHA-256 的确认记录，并在所有必填映射都明确时确定性生成 ResearchSpec。任何一步都不会获取数据或执行统计。
 
 固定 WTI workflow plan proposal：
 
@@ -255,6 +279,29 @@ python -m market_validator propose-plan `
 两条命令都只原子写入严格解析后的 proposal，不会自动确认、编译、运行或生成 artifact。DeepSeek 的结构化生成必须显式授权联网且最多发送一次无重试请求；Codex Plus 生成仍未实现。
 
 ## 用户确认、编译和运行
+
+通用 Hypothesis Proposal 的澄清、确认与 ResearchSpec 生成全部离线：
+
+```powershell
+python -m market_validator hypothesis validate-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json>
+python -m market_validator hypothesis apply-clarifications `
+  --proposal <draft-proposal.json> `
+  --answers <clarification-answers.json> `
+  --output <clarified-proposal.json>
+python -m market_validator hypothesis confirm-proposal `
+  --proposal <clarified-proposal.json> `
+  --output <confirmation.json>
+python -m market_validator hypothesis compile-research-spec `
+  --proposal <clarified-proposal.json> `
+  --confirmation <confirmation.json> `
+  --output <research-spec.json>
+```
+
+Ready 不等于 Confirmed，Confirmed 不等于已执行。修改 Proposal 任一有效字段会改变规范化哈希并使旧确认失效。编译成功只生成 ResearchSpec 与 provenance sidecar；缺少既有 ResearchSpec 必填映射时会返回结构化 unresolved requirements，不会猜测或写出伪造规格。
+
+下面是独立的固定 WTI WorkflowPlan 流程。
 
 验证 proposal：
 
@@ -348,7 +395,6 @@ GitHub Actions 在 Windows 和 Linux、Python 3.11 和 3.13 上执行上述流�
 
 尚未实现：
 
-- 从已澄清并确认的通用 Hypothesis Proposal 构建 ResearchSpec；
 - 自动数据源选择或联网市场数据 workflow；
 - 通用跨市场交易日历对齐执行；
 - 通用相关性、回归、因果推断、回测或报告执行；
