@@ -405,6 +405,27 @@ class SourceSelectionIdentityVerificationTest(unittest.TestCase):
             SourceSelectionReviewErrorCode.SOURCE_SELECTION_MAPPING_MISMATCH,
         )
 
+    def test_invalid_decision_input_is_structured_failure(self) -> None:
+        generated, confirmation, instruments, calendars = (
+            _generate_data_plan_confirmed()
+        )
+        decisions = _decisions_for_all(generated, instruments)
+        decisions[0] = {
+            "requirement_id": decisions[0].requirement_id,
+            "provider_id": "synthetic_provider",
+            "provider_symbol": "SYNTH_OUTCOME",
+            "dataset_or_endpoint": "/synthetic/series",
+        }
+        with self.assertRaises(SourceSelectionReviewError) as raised:
+            generate_source_selection(
+                generated, confirmation, instruments, calendars, decisions
+            )
+        self.assertEqual(
+            raised.exception.failure.code,
+            SourceSelectionReviewErrorCode.INVALID_SOURCE_SELECTION,
+        )
+        self.assertNotIn("requirement", raised.exception.failure.message)
+
     def test_unknown_requirement_decision_is_hard_failure(self) -> None:
         generated, confirmation, instruments, calendars = (
             _generate_data_plan_confirmed()

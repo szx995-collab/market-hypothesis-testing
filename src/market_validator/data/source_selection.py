@@ -636,6 +636,12 @@ def parse_source_selection_decision(
 
 
 def _serialize_decision(decision: SourceSelectionDecision) -> bytes:
+    if not isinstance(decision, SourceSelectionDecision):
+        fail_source_selection_review(
+            SourceSelectionReviewErrorCode.INVALID_SOURCE_SELECTION,
+            SourceSelectionReviewStage.SOURCE_SELECTION_VALIDATION,
+            "source selection decision must be a validated model",
+        )
     return _serialize_strict(decision, label="SourceSelection decision")
 
 
