@@ -43,6 +43,10 @@ from market_validator.data.serialization import (
     parse_data_plan,
 )
 from market_validator.data.providers.base import ProviderCapabilities
+from market_validator.data.providers.fred_provider import (
+    FRED_OBSERVATIONS_PATH,
+    FRED_SERIES_PATH,
+)
 from market_validator.data.registry import IdentityStatus, InstrumentRegistry
 from market_validator.data.source_selection import (
     GeneratedSourceSelection,
@@ -68,7 +72,7 @@ from market_validator.research.serialization import (
     calculate_research_spec_sha256,
 )
 
-ACQUISITION_REQUEST_SCHEMA_VERSION = "1.0"
+ACQUISITION_REQUEST_SCHEMA_VERSION = "1.1"
 Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -147,6 +151,29 @@ class PreSampleResolutionMethod(StrEnum):
 class PreSampleStatus(StrEnum):
     RESOLVED = "resolved"
     UNRESOLVED = "unresolved"
+
+
+class PaginationPolicy(StrEnum):
+    NONE = "none"
+    FRED_COUNT_OFFSET_V1 = "fred_count_offset_v1"
+
+
+class PublicRequestStep(StrictResearchModel):
+    """One exact public request step of an acquisition request."""
+
+    step_id: Identifier
+    sequence: int
+    method: RequestMethod
+    endpoint: NonEmptyString
+    public_parameters: dict[str, str]
+    pagination_policy: PaginationPolicy
+
+    @field_validator("sequence")
+    @classmethod
+    def validate_sequence(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("sequence must be a positive integer")
+        return value
 
 
 class ProviderCapabilitySnapshot(StrictResearchModel):
@@ -235,6 +262,7 @@ class PublicAcquisitionRequest(StrictResearchModel):
     pre_sample_periods_required: int
     pre_sample_resolution_method: PreSampleResolutionMethod
     revision_policy: DataRevisionMode
+    steps: list[PublicRequestStep]
 
     @field_validator("sample_end")
     @classmethod
@@ -255,6 +283,17 @@ class PublicAcquisitionRequest(StrictResearchModel):
                 "acquisition_start must not be later than sample_start"
             )
         return value
+
+    @field_validator("steps")
+    @classmethod
+    def validate_steps(cls, value: list[PublicRequestStep]) -> list[PublicRequestStep]:
+        sequences = [step.sequence for step in value]
+        if len(sequences) != len(set(sequences)):
+            raise ValueError("request step sequences must be unique")
+        step_ids = [step.step_id for step in value]
+        if len(step_ids) != len(set(step_ids)):
+            raise ValueError("request step ids must be unique")
+        return sorted(value, key=lambda step: step.sequence)
 
 
 class AcquisitionUnresolvedCode(StrEnum):
@@ -282,7 +321,7 @@ class UnresolvedAcquisitionRequirement(StrictResearchModel):
 class AcquisitionRequestPlan(StrictResearchModel):
     """Deterministic, provider-neutral acquisition request artifact."""
 
-    acquisition_request_schema_version: Literal["1.0"] = (
+    acquisition_request_schema_version: Literal["1.1"] = (
         ACQUISITION_REQUEST_SCHEMA_VERSION
     )
     request_plan_id: NonEmptyString
@@ -673,7 +712,7 @@ def _fred_public_parameters(
         "observation_start": requirement.start_date.isoformat(),
         "observation_end": requirement.end_date.isoformat(),
         "output_type": output_type,
-        "revision_policy": mode.value,
+        "limit": "100000",
     }
     if mode is DataRevisionMode.INITIAL_RELEASE:
         parameters.update(
@@ -687,8 +726,29 @@ def _fred_public_parameters(
 
 def _default_fred_template(
     requirement: DataRequirement, series_id: str
-) -> dict[str, str]:
-    return _fred_public_parameters(requirement, series_id)
+) -> list[PublicRequestStep]:
+    parameters = _fred_public_parameters(requirement, series_id)
+    return [
+        PublicRequestStep(
+            step_id="fred-series-metadata",
+            sequence=1,
+            method=RequestMethod.GET,
+            endpoint=FRED_SERIES_PATH,
+            public_parameters={
+                "series_id": series_id,
+                "file_type": "json",
+            },
+            pagination_policy=PaginationPolicy.NONE,
+        ),
+        PublicRequestStep(
+            step_id="fred-series-observations",
+            sequence=2,
+            method=RequestMethod.GET,
+            endpoint=FRED_OBSERVATIONS_PATH,
+            public_parameters=parameters,
+            pagination_policy=PaginationPolicy.FRED_COUNT_OFFSET_V1,
+        ),
+    ]
 
 
 def _build_request(
@@ -697,7 +757,7 @@ def _build_request(
     snapshot: ProviderCapabilitySnapshot,
     resolution: PreSampleResolution,
     parameter_templates: Mapping[
-        str, Callable[[DataRequirement, str], dict[str, str]]
+        str, Callable[[DataRequirement, str], list[PublicRequestStep]]
     ],
 ) -> PublicAcquisitionRequest:
     if AccessMode.NETWORK in snapshot.supported_access_modes:
@@ -711,13 +771,29 @@ def _build_request(
                 f"no public parameter template for network provider "
                 f"{selection.provider_id}",
             )
-        public_parameters = template(requirement, selection.provider_symbol)
+        steps = template(requirement, selection.provider_symbol)
         endpoint = selection.dataset_or_endpoint
+        merged_parameters: dict[str, str] = {}
+        for step in steps:
+            for key, value in step.public_parameters.items():
+                merged_parameters[key] = value
     else:
         access_mode = AccessMode.LOCAL_FILE
         request_method = RequestMethod.READ
-        public_parameters = {"source_uri": selection.provider_symbol}
+        steps = [
+            PublicRequestStep(
+                step_id="local-file-read",
+                sequence=1,
+                method=RequestMethod.READ,
+                endpoint=selection.provider_symbol,
+                public_parameters={"source_uri": selection.provider_symbol},
+                pagination_policy=PaginationPolicy.NONE,
+            )
+        ]
         endpoint = selection.provider_symbol
+        merged_parameters = {
+            "source_uri": selection.provider_symbol
+        }
     return PublicAcquisitionRequest(
         requirement_id=requirement.requirement_id,
         variable_id=requirement.variable_id,
@@ -727,7 +803,7 @@ def _build_request(
         dataset_or_endpoint=endpoint,
         access_mode=access_mode,
         request_method=request_method,
-        public_parameters=public_parameters,
+        public_parameters=merged_parameters,
         sample_start=requirement.start_date,
         sample_end=requirement.end_date,
         acquisition_start=resolution.resolved_acquisition_start,
@@ -735,6 +811,7 @@ def _build_request(
         pre_sample_periods_required=requirement.required_pre_sample_periods,
         pre_sample_resolution_method=resolution.method,
         revision_policy=requirement.revision_policy.mode,
+        steps=steps,
     )
 
 
@@ -758,7 +835,7 @@ def generate_acquisition_request_plan(
     *,
     session_adapters: Mapping[str, Callable[[date, int], date]] | None = None,
     public_parameter_templates: Mapping[
-        str, Callable[[DataRequirement, str], dict[str, str]]
+        str, Callable[[DataRequirement, str], list[PublicRequestStep]]
     ]
     | None = None,
 ) -> GeneratedAcquisitionRequestPlan:
@@ -812,7 +889,7 @@ def generate_acquisition_request_plan(
         for provider_id, snapshot in sorted(capability_snapshots.items())
     }
     templates: Mapping[
-        str, Callable[[DataRequirement, str], dict[str, str]]
+        str, Callable[[DataRequirement, str], list[PublicRequestStep]]
     ] = {
         **public_parameter_templates,
         "fred": _default_fred_template,
@@ -1297,7 +1374,9 @@ __all__ = [
     "PreSampleResolutionMethod",
     "PreSampleStatus",
     "ProviderCapabilitySnapshot",
+    "PaginationPolicy",
     "PublicAcquisitionRequest",
+    "PublicRequestStep",
     "RenderPublicAcquisitionRequest",
     "RequestMethod",
     "UnresolvedAcquisitionRequirement",
