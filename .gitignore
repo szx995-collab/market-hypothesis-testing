@@ -34,6 +34,7 @@ htmlcov/
 .ruff_cache/
 .tox/
 .nox/
+tests/.runtime_*/
 
 # Virtual environments and package builds
 .venv/
