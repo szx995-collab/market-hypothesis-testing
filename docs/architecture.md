@@ -26,6 +26,8 @@ ResearchSpec 编译是纯 Python 操作，不调用 LLM、网络、数据源或 
 
 `DataPlan` 生命周期（`generate` → `validate` → `confirm` → `validate-confirmation`）为纯 Python 离线确定性流程：DataPlan identity 绑定 ResearchSpec、DataPlan 与双 registry snapshot 的 canonical SHA-256；requirement 仅在 instrument 已注册且 identity 已验证、registry 元数据一致、calendar 存在且存在符合契约的 verified provider mapping 时才可确认。状态保持分离：Proposal Ready ≠ Proposal Confirmed ≠ ResearchSpec Generated ≠ DataPlan Ready ≠ DataPlan Confirmed ≠ Data Fetch Authorized ≠ Executed。`DataPlanConfirmation` 只供后续来源选择审查，不授权网络、下载、Provider 请求、付费、分析、回测、交易或下单；任一有效内容改变（spec/plan/任一 registry）都会使旧确认失效。verified mapping 的存在不代表自动 provider 选择或数据获取授权。
 
+`SourceSelection` 生命周期（v0.3.0 第一阶段）在 `DataPlan Confirmed` 之后运行：`generate_source_selection` 把 `DataPlanConfirmation`、当前双 registry 快照与用户显式的 `SourceSelectionDecision` 组合为确定性 artifact。决策只以 `provider_id` + `provider_symbol` + `dataset_or_endpoint` 精确匹配 registry mapping；最终 selection 的 identity 与 verification metadata 一律从 registry 复制。单一候选也不自动选择，缺失决策生成 `source_not_selected` unresolved；选择不存在、unverified 或 market 冲突的 mapping 是结构化 hard failure。`SourceSelection` 绑定 ResearchSpec/DataPlan/DataPlanConfirmation/双 registry 六个 canonical hash，`selection_id` 由绑定与选择内容确定性派生；readiness 为空才可创建 `SourceSelectionConfirmation`，其含义仅为“供后续 acquisition-request planning 审查”，不授权网络、Provider、credential、下载、付费、retry、fallback、分析、回测、交易或下单。registry 内容或任一绑定变化都会使旧确认失效，仅条目顺序变化不影响 identity。
+
 ## ResearchSpec 领域边界
 
 ResearchSpec 1.0 是 `spec_review` 状态将使用的供应商无关协议。目前只支持创建、JSON 序列化/反序列化、JSON Schema 生成和确定性验证，不负责自然语言解析、数据获取或分析。
@@ -60,6 +62,7 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 | `hypothesis_draft` | 用户的自然语言假设及可选背景 | 识别待研究的关系、对象、时间语境和明显歧义 | 结构化但尚未批准的假设草案，以及待澄清问题 | LLM 草拟；用户补充歧义信息，不执行计算 |
 | `spec_review` | 假设草案、用户补充信息 | 明确定义变量、数学表达、样本范围、频率、时间区间、基准、检验方法和判定标准 | 有版本的研究规格与确认记录，或修改请求 | LLM 解释规格；确定性代码校验结构与必填项；**用户必须明确确认数学定义和研究范围** |
 | `data_plan` | 已确认的研究规格 | 将每个变量映射为数据需求、字段、频率、时间覆盖、质量要求和来源选择标准 | 可审阅的数据计划，不绑定当前尚未选定的提供商 | LLM 可提出需求映射；Python 校验计划与规格的一致性；来源限制或成本变化需要用户再次确认 |
+| `source_selection` | 已确认的数据计划与当前 registry 快照 | 将每个 requirement 显式绑定到一个 registry-backed、verified 的 Provider mapping | 确定性的来源选择与确认记录，不包含网络或获取授权 | **用户必须为每个 requirement 明确选择 mapping**；Python 只做精确匹配与哈希绑定，绝不自动选择 |
 | `data_ready` | 已批准的数据计划、获取配置及来源凭据 | 获取、校验、规范化并冻结分析所需数据 | 带来源元数据、质量检查、版本或哈希的分析数据集 | 确定性 Python 负责；若数据缺失导致样本或定义变化，必须返回 `spec_review` 并由用户确认 |
 | `analysis` | 已确认规格、冻结数据集、分析参数 | 按规格执行计算和统计检验 | 机器可读的主要估计、检验结果、诊断和运行日志 | 确定性 Python 负责计算；LLM 不生成或改写数值结果 |
 | `robustness` | 主分析结果、规格中约定的稳健性方案、冻结数据 | 执行敏感性分析、替代定义或子样本检验，并记录偏离 | 机器可读的稳健性结果、比较表和异常说明 | 确定性 Python 负责计算；新增且可能改变结论的检验应由用户确认后执行 |
@@ -69,7 +72,7 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 
 正常流转顺序为：
 
-`hypothesis_draft` → `spec_review` → `data_plan` → `data_ready` → `analysis` → `robustness` → `report`
+`hypothesis_draft` → `spec_review` → `data_plan` → `source_selection` → `data_ready` → `analysis` → `robustness` → `report`
 
 `spec_review` 是正式分析前的强制闸门。没有用户对数学定义、变量、样本和方法的明确确认，不得进入数据执行或分析。任何会实质改变已确认规格的情况——例如数据不可得、替代变量、时间范围变化或新增方法——都必须生成变更记录并返回用户确认。
 
