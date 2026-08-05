@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "market-validator"
-version = "0.1.0"
+version = "0.2.0"
 description = "A reproducible workflow for validating financial market hypotheses"
 readme = "README.md"
 license = "MIT"
