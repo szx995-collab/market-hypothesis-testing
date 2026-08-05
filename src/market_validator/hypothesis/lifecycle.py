@@ -23,6 +23,9 @@ class HypothesisLifecycleErrorCode(StrEnum):
     PROPOSAL_NOT_READY = "hypothesis_proposal_not_ready"
     INVALID_CONFIRMATION = "invalid_hypothesis_confirmation"
     CONFIRMATION_MISMATCH = "hypothesis_confirmation_mismatch"
+    INVALID_COMPLETION = "invalid_research_spec_completion"
+    COMPLETION_MISMATCH = "research_spec_completion_mismatch"
+    COMPLETION_CONFLICT = "research_spec_completion_conflict"
     RESEARCH_SPEC_UNRESOLVED = "research_spec_unresolved"
     RESEARCH_SPEC_INVALID = "research_spec_invalid"
     OUTPUT_CONFLICT = "hypothesis_review_output_conflict"
@@ -33,6 +36,8 @@ class HypothesisLifecycleStage(StrEnum):
     CLARIFICATION_VALIDATION = "hypothesis_clarification_validation"
     CLARIFICATION_APPLICATION = "hypothesis_clarification_application"
     CONFIRMATION_VALIDATION = "hypothesis_confirmation_validation"
+    COMPLETION_VALIDATION = "research_spec_completion_validation"
+    COMPLETION_APPLICATION = "research_spec_completion_application"
     RESEARCH_SPEC_COMPILATION = "research_spec_compilation"
     OUTPUT = "hypothesis_review_output"
 

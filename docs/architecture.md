@@ -22,6 +22,10 @@ LLM 只选择可审阅的结构和 `target_parameter`/`direction`。Python 根�
 
 ResearchSpec 编译是纯 Python 操作，不调用 LLM、网络、数据源或 shell。输出必须通过现有 ResearchSpec 验证与 canonical serialization，并使用 sidecar 保存 Proposal hash、confirmation hash 和审计时间。确认或生成 ResearchSpec 不会下载数据、编译 workflow 或执行统计。
 
+当编译返回 unresolved requirements 时，`ResearchSpecCompletionAnswers` 只能填充 `research_spec_inputs` 并生成新 Proposal 版本：旧确认因 hash 变化自动失效，用户必须重新显式确认新 Proposal 后才能编译；补全记录本身不是确认，且不存在 `--yes`/`--force` 绕过路径。补全输入必须精确覆盖声明变量集合与 asset type，未知/重复/缺失/冲突映射一律拒绝。
+
+`DataPlan` 生命周期（`generate` → `validate` → `confirm` → `validate-confirmation`）为纯 Python 离线确定性流程：DataPlan identity 绑定 ResearchSpec、DataPlan 与双 registry snapshot 的 canonical SHA-256；requirement 仅在 instrument 已注册且 identity 已验证、registry 元数据一致、calendar 存在且存在符合契约的 verified provider mapping 时才可确认。状态保持分离：Proposal Ready ≠ Proposal Confirmed ≠ ResearchSpec Generated ≠ DataPlan Ready ≠ DataPlan Confirmed ≠ Data Fetch Authorized ≠ Executed。`DataPlanConfirmation` 只供后续来源选择审查，不授权网络、下载、Provider 请求、付费、分析、回测、交易或下单；任一有效内容改变（spec/plan/任一 registry）都会使旧确认失效。verified mapping 的存在不代表自动 provider 选择或数据获取授权。
+
 ## ResearchSpec 领域边界
 
 ResearchSpec 1.0 是 `spec_review` 状态将使用的供应商无关协议。目前只支持创建、JSON 序列化/反序列化、JSON Schema 生成和确定性验证，不负责自然语言解析、数据获取或分析。

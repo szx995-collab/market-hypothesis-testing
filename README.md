@@ -115,6 +115,44 @@ python -m market_validator hypothesis compile-research-spec `
   --output <research-spec.json>
 ```
 
+When compilation reports `unresolved_requirements`, supply explicit provider-neutral mappings offline. This creates a new Proposal version, invalidates the old confirmation, and requires a fresh explicit confirmation:
+
+```powershell
+python -m market_validator hypothesis apply-completion `
+  --proposal <clarified-proposal.json> `
+  --answers <completion-answers.json> `
+  --output <completed-proposal.json>
+python -m market_validator hypothesis confirm-proposal `
+  --proposal <completed-proposal.json> `
+  --output <new-confirmation.json>
+python -m market_validator hypothesis compile-research-spec `
+  --proposal <completed-proposal.json> `
+  --confirmation <new-confirmation.json> `
+  --output <research-spec.json>
+```
+
+Generate and confirm a provider-neutral `DataPlan` from a compiled `ResearchSpec` and explicit registry snapshots. Confirmation binds the exact canonical hashes and never authorizes data access:
+
+```powershell
+python -m market_validator data-plan generate `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan.json>
+python -m market_validator data-plan confirm `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json> `
+  --output <data-plan-confirmation.json>
+python -m market_validator data-plan validate-confirmation `
+  --confirmation <data-plan-confirmation.json> `
+  --plan <data-plan.json> `
+  --research-spec <research-spec.json> `
+  --instrument-registry <instruments.json> `
+  --calendar-registry <calendars.json>
+```
+
 Ready is not Confirmed, and Confirmed is not executed. Any effective proposal change invalidates the old confirmation hash. Missing existing ResearchSpec fields produce structured unresolved requirements rather than guessed defaults.
 
 ```powershell
@@ -264,6 +302,8 @@ python -m market_validator propose-hypothesis `
 ```
 
 该命令只生成不可信草案。后续离线命令可应用用户明确给出的结构化澄清、创建绑定规范化 SHA-256 的确认记录，并在所有必填映射都明确时确定性生成 ResearchSpec。任何一步都不会获取数据或执行统计。
+
+当编译返回 `unresolved_requirements` 时，可离线提供显式 provider-neutral 补全（`hypothesis apply-completion`）：补全只能设置 `research_spec_inputs`，生成新 Proposal 版本并使旧确认失效，必须重新显式确认后才能编译 ResearchSpec。随后可从 ResearchSpec + 显式 registry snapshot 确定性生成并确认 provider-neutral `DataPlan`（`data-plan generate` / `data-plan confirm` / `data-plan validate-confirmation`）；DataPlan 确认绑定 ResearchSpec/DataPlan/双 registry 的 canonical SHA-256，不授权任何数据获取、Provider 请求、分析或回测。
 
 固定 WTI workflow plan proposal：
 

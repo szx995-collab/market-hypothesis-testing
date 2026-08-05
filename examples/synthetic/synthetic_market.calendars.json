@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "calendars": [
+    {
+      "calendar_id": "synthetic.test.equity",
+      "display_name": "Synthetic test equity calendar",
+      "timezone": "UTC",
+      "calendar_type": "equity_exchange",
+      "schedule_adapter": null,
+      "supports_special_sessions": false,
+      "notes": [
+        "TEST-ONLY synthetic fixture; this is not a real market calendar and must never be used as one."
+      ]
+    }
+  ]
+}
