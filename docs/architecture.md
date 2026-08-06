@@ -117,6 +117,17 @@ multiple testing corrections）产出 `AnalysisResult`。结果目录 create-onl
 不联网、不读取 credential、不执行 robustness、不生成报告。详见
 `docs/analysis_execution.md`。
 
+## 结果解释（v0.4.0 Phase 3）
+
+`interpret_analysis_result` 把已验证的 `AnalysisResult` 编译为确定性
+`AnalysisEvidencePackage`（总体结论由 Python 聚合，LLM 不得修改），
+通过版本化 prompt 调用 LLM（默认禁网；仅 https 或 loopback http），
+grounding 校验拒绝编造数字、错误结论、未知/缺失 test 与交易建议，
+最终由 Python 确定性渲染 11 节 Markdown 验证报告并持久化到不可变
+`analysis-interpretations/` 目录（staging + atomic rename + create-only）。
+LLM 只解释，不计算；原始数据与 credential 永不发送。详见
+`docs/analysis_interpretation.md`。
+
 ## 统一 data-lifecycle CLI
 
 v0.3.0 提供统一 JSON-only CLI（`market-validator data-lifecycle ...`，

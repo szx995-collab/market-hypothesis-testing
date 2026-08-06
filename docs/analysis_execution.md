@@ -141,6 +141,12 @@ analysis-runs/<attempt_id>/
 AnalysisResult 只含统计合同输出；本阶段不调用 LLM、不生成自然语言
 结论、不执行 robustness、不生成最终报告。
 
+## 结果解释边界
+
+`AnalysisResult` 之后的结果解释由 v0.4.0 Phase 3 负责：确定性
+EvidencePackage + grounded LLM 解释 + Markdown 验证报告；LLM 不改变
+结论、不增加数字、不提供投资建议。详见 `docs/analysis_interpretation.md`。
+
 ## 非投资建议
 
 Result Verified ≠ Investment Advice；系统不执行真实交易、不提供自动
