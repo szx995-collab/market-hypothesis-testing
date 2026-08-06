@@ -1,4 +1,4 @@
-"""Version metadata consistency tests (v0.3.0 release)."""
+"""Version metadata consistency tests (v0.4.0 release)."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED = "0.3.0"
+EXPECTED = "0.4.0"
 
 
 class VersionMetadataTest(unittest.TestCase):
@@ -39,7 +39,7 @@ class VersionMetadataTest(unittest.TestCase):
             f"[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v{EXPECTED}...HEAD", changelog
         )
         self.assertIn(
-            f"[{EXPECTED}]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.2.0...v{EXPECTED}", changelog
+            f"[{EXPECTED}]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.3.0...v{EXPECTED}", changelog
         )
 
     def test_release_notes_exist(self):
@@ -48,7 +48,7 @@ class VersionMetadataTest(unittest.TestCase):
     def test_tag_expectation_helper(self):
         # The annotated tag v0.3.0 must point at the release commit; this
         # helper keeps the expectation in one place for release tooling.
-        self.assertEqual("v" + EXPECTED, "v0.3.0")
+        self.assertEqual("v" + EXPECTED, "v0.4.0")
 
 
 if __name__ == "__main__":
