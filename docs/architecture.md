@@ -125,6 +125,8 @@ multiple testing corrections）产出 `AnalysisResult`。结果目录 create-onl
 grounding 校验拒绝编造数字、错误结论、未知/缺失 test 与交易建议，
 最终由 Python 确定性渲染 11 节 Markdown 验证报告并持久化到不可变
 `analysis-interpretations/` 目录（staging + atomic rename + create-only）。
+- `research_session`: 个人研究会话编排（ResearchAgent），自动推进安全步骤并在用户决定/授权/网络/文件缺口处停止
+
 LLM 只解释，不计算；原始数据与 credential 永不发送。详见
 `docs/analysis_interpretation.md`。
 

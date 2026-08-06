@@ -228,6 +228,7 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 
 ---
 
+
 ## 中文
 
 `market-validator` 是一个强调安全边界、可审计性和可复现性的金融市场假设验证项目。它把“提出研究计划”和“执行确定性计算”严格分开：AI 只能提出待审阅的计划和解释已经验证的结果，数据事实、转换、统计量、结论判定与产物校验均来自确定性 Python 代码。
@@ -503,3 +504,19 @@ GitHub Actions 在 Windows 和 Linux、Python 3.11 和 3.13 上执行上述流�
 - README：中英双语
 
 发布操作必须显式执行；项目本身不会自动创建远程仓库、GitHub release 或推送代码。
+
+
+## Research agent（研究会话）
+
+把自然语言问题沿既有生命周期推进到最终 Markdown 报告：
+
+```powershell
+market-validator research start --question-file hypothesis.txt `
+  --workspace .\research-001 --provider deepseek_api --model <MODEL> `
+  --allow-llm-network
+market-validator research resume --session .\research-001
+```
+
+报告输出在 `final/validation-report.md`。Agent 不会自动确认、授权、
+联网或消费 single-use authorization；每一步需要用户决定时都会停下来
+说明原因。
