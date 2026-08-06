@@ -167,3 +167,9 @@ bytes 与 provenance sidecar（`.provenance.json`）：create-only、不覆盖
 现有文件、相同路径不同内容明确冲突、拒绝 path traversal 与 symlink、
 非 regular-file 输入拒绝、部分输出不得被视为成功。错误结构化且不包含
 原始敏感输入。
+
+## CLI
+
+`market-validator data-lifecycle source-selection generate|confirm|validate-confirmation`
+提供 JSON-only 统一入口（见 `docs/data_lifecycle_cli.md`）；generate 不会在
+decisions 缺失时自动选择唯一 mapping。

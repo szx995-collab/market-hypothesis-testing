@@ -58,7 +58,11 @@ def add_data_parser(subparsers: argparse._SubParsersAction) -> None:
     fred_commands = fred_parser.add_subparsers(dest="fred_command", required=True)
     fred_commands.add_parser("status", help="check local FRED configuration only")
     fetch_parser = fred_commands.add_parser(
-        "fetch", help="dry-run a FRED requirement unless --live is explicit"
+        "fetch",
+        help=(
+            "legacy provider diagnostic: dry-run a FRED requirement unless "
+            "--live is explicit; this is NOT the formal data lifecycle"
+        ),
     )
     fetch_parser.add_argument("requirement_json", type=Path)
     fetch_parser.add_argument(
@@ -218,7 +222,11 @@ def handle_data_command(args: argparse.Namespace) -> int:
                     environment=os.environ,
                 )
                 if not args.live:
-                    print(json.dumps(provider.dry_run(requirement), sort_keys=True))
+                    dry_run = provider.dry_run(requirement)
+                    dry_run["formal_lifecycle"] = False
+                    dry_run["data_ready"] = False
+                    dry_run["authorization_artifact_enforced"] = False
+                    print(json.dumps(dry_run, sort_keys=True))
                     return 0
 
                 bundle = provider.fetch(requirement)
@@ -237,6 +245,9 @@ def handle_data_command(args: argparse.Namespace) -> int:
                             "quality_status": bundle.quality.status.value,
                             "source": bundle.source.model_dump(mode="json"),
                             "snapshot": snapshot.public_summary(),
+                            "formal_lifecycle": False,
+                            "data_ready": False,
+                            "authorization_artifact_enforced": False,
                         },
                         sort_keys=True,
                     )

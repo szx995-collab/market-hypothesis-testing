@@ -159,3 +159,10 @@ byte-identical 幂等、同路径不同内容冲突、path traversal/symlink/非
 regular-file 拒绝、部分写入不得视为成功、provenance 时间信息放 sidecar；
 authorization 与 receipt 分开持久化；错误消息不包含原始 JSON、secret 或
 credential。未修改 Phase 1 的 canonical bytes 与既有语义。
+
+## CLI
+
+统一 JSON-only `data-lifecycle` CLI 覆盖 acquisition generate/validate 与
+authorization create/validate（见 `docs/data_lifecycle_cli.md`）；authorization
+不接受 paid/retry/fallback 开关，`--authorize-network` 仅在 plan 含 network
+request 时接受。

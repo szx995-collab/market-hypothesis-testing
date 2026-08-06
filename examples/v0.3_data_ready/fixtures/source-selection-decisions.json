@@ -1,0 +1,14 @@
+[
+  {
+    "requirement_id": "test-only-synthetic-association.test_only.outcome",
+    "provider_id": "local_csv",
+    "provider_symbol": "{LOCAL_CSV_OUTCOME_PATH}",
+    "dataset_or_endpoint": "{LOCAL_CSV_OUTCOME_PATH}"
+  },
+  {
+    "requirement_id": "test-only-synthetic-association.test_only.predictor",
+    "provider_id": "local_csv",
+    "provider_symbol": "{LOCAL_CSV_PREDICTOR_PATH}",
+    "dataset_or_endpoint": "{LOCAL_CSV_PREDICTOR_PATH}"
+  }
+]

@@ -1,5 +1,21 @@
 # Data Readiness 与 DataReadyManifest（v0.3.0 Phase 4）
 
+## 0. schema 1.1 与精确 session-evidence 绑定
+
+v0.3.0 将 `DataReadinessAssessment` 与 `DataReadyManifest` 升级到 schema 1.1：
+
+- 每个 requirement 绑定完整 expected/observed **sample** 与
+  **pre-sample** session-set SHA-256（基于严格 canonical 日期数组，
+  空集合也有确定性 hash；重复/乱序在 hash 前拒绝）。
+- `session_schedule_sha256s` 绑定 `ExplicitSessionScheduleSnapshot`
+  （见 `docs/session_schedule.md` 对应章节与 `src/market_validator/data/session_schedule.py`）。
+- `assessment_id` / `data_ready_id` 派生自**完整 canonical core**
+  （所有上游 hash、schedule hashes、全部 requirement assessments、
+  blockers、warnings），不再是三个 hash 的摘要。
+- 旧 1.0 artifact 严格 fail closed，不静默转换；文档要求重新运行
+  readiness assessment。
+- counts 与首末日期仍保留，但只是可读摘要，不能替代集合 hash。
+
 ## 1. workflow 位置
 
 ```text

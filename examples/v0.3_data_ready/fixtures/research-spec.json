@@ -1,0 +1,82 @@
+{
+  "schema_version": "1.0",
+  "spec_id": "v0.3-test-only-synthetic-association",
+  "title": "TEST-ONLY synthetic association: sample outcome vs predictor",
+  "original_hypothesis": "TEST-ONLY: sample outcome is associated with sample predictor.",
+  "normalized_hypothesis": "TEST-ONLY: association between two synthetic variables over a short daily window.",
+  "claim_type": "association",
+  "outcome": {
+    "variable_id": "test_only.outcome",
+    "role": "outcome",
+    "instrument": {
+      "instrument_id": "test.only.outcome.series",
+      "display_name": "TEST-ONLY synthetic outcome series",
+      "asset_type": "macro_series",
+      "market": "Synthetic Test Market",
+      "exchange_or_venue": "Synthetic test venue",
+      "timezone": "UTC",
+      "currency": "USD",
+      "unit": "index points",
+      "continuous_contract": false
+    },
+    "field": "value",
+    "transformation": "level",
+    "lag_periods": 0,
+    "availability_lag_periods": 0,
+    "price_adjustment": null,
+    "contract_roll_method": null,
+    "proxy_for": null,
+    "rolling_window_periods": null
+  },
+  "predictors": [
+    {
+      "variable_id": "test_only.predictor",
+      "role": "predictor",
+      "instrument": {
+        "instrument_id": "test.only.predictor.series",
+        "display_name": "TEST-ONLY synthetic predictor series",
+        "asset_type": "macro_series",
+        "market": "Synthetic Test Market",
+        "exchange_or_venue": "Synthetic test venue",
+        "timezone": "UTC",
+        "currency": "USD",
+        "unit": "index points",
+        "continuous_contract": false
+      },
+      "field": "value",
+      "transformation": "level",
+      "lag_periods": 0,
+      "availability_lag_periods": 0,
+      "price_adjustment": null,
+      "contract_roll_method": null,
+      "proxy_for": null,
+      "rolling_window_periods": null
+    }
+  ],
+  "controls": [],
+  "sample": {
+    "start_date": "2020-01-01",
+    "end_date": "2020-01-10",
+    "frequency": "1d",
+    "minimum_observations": 8
+  },
+  "alignment": null,
+  "model": {
+    "method": "pearson_correlation",
+    "formula": "corr(test_only.outcome, test_only.predictor)",
+    "formula_variable_ids": ["test_only.outcome", "test_only.predictor"],
+    "null_hypothesis": "The population correlation coefficient is zero.",
+    "alternative_hypothesis": "The population correlation coefficient is not zero.",
+    "direction": "two_sided",
+    "significance_level": 0.05,
+    "minimum_effect_size": 0.0,
+    "multiple_testing_correction": "none"
+  },
+  "robustness_checks": [],
+  "assumptions": [
+    "TEST-ONLY synthetic fixture; both series are invented and carry no real market meaning."
+  ],
+  "limitations": [
+    "TEST-ONLY fixture; it must never be presented as a real market data source."
+  ]
+}

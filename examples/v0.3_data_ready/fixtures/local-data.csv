@@ -1,0 +1,9 @@
+instrument_id,field,value,observation_time,available_time,session_date,timezone,currency,unit
+test.only.outcome.series,value,1.0,2020-01-01T00:00:00Z,2020-01-01T00:00:00Z,2020-01-01,UTC,USD,index points
+test.only.outcome.series,value,2.0,2020-01-02T00:00:00Z,2020-01-02T00:00:00Z,2020-01-02,UTC,USD,index points
+test.only.outcome.series,value,3.0,2020-01-03T00:00:00Z,2020-01-03T00:00:00Z,2020-01-03,UTC,USD,index points
+test.only.outcome.series,value,4.0,2020-01-06T00:00:00Z,2020-01-06T00:00:00Z,2020-01-06,UTC,USD,index points
+test.only.outcome.series,value,5.0,2020-01-07T00:00:00Z,2020-01-07T00:00:00Z,2020-01-07,UTC,USD,index points
+test.only.outcome.series,value,6.0,2020-01-08T00:00:00Z,2020-01-08T00:00:00Z,2020-01-08,UTC,USD,index points
+test.only.outcome.series,value,7.0,2020-01-09T00:00:00Z,2020-01-09T00:00:00Z,2020-01-09,UTC,USD,index points
+test.only.outcome.series,value,8.0,2020-01-10T00:00:00Z,2020-01-10T00:00:00Z,2020-01-10,UTC,USD,index points

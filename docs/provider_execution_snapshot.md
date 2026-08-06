@@ -1,5 +1,10 @@
 # Provider Execution & Transactional Snapshot
 
+
+正式执行请使用 `market-validator data-lifecycle execution run`
+（JSON-only 统一 CLI，见 `docs/data_lifecycle_cli.md`）；`data fred fetch --live`
+仅为 legacy provider diagnostic，不使用 DataAccessAuthorization，不能产生
+Data Ready。
 ## Workflow position
 
 ```text
