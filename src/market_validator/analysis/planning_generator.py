@@ -446,6 +446,27 @@ def _build_alignment_plan(
                     "only strict same-session alignment is executable",
                 )
             )
+        if alignment.missing_data_policy is MissingDataPolicy.KEEP_MISSING:
+            unresolved.append(
+                _unresolved(
+                    UnresolvedAnalysisRequirementCode.ANALYSIS_MISSING_POLICY_NOT_EXECUTABLE,
+                    "keep-missing is not executable by the current analysis "
+                    "engine",
+                )
+            )
+        cutoff = alignment.information_cutoff
+        if (
+            cutoff is not None
+            and cutoff.type.value
+            in ("before_target_open", "before_target_close")
+        ):
+            unresolved.append(
+                _unresolved(
+                    UnresolvedAnalysisRequirementCode.INFORMATION_CUTOFF_NOT_EXECUTABLE,
+                    "before-open and before-close cutoffs have no precise "
+                    "session-time contract in the calendar registry",
+                )
+            )
         plan = AlignmentPlan(
             target_variable_id=outcome.variable_id,
             target_calendar_id=calendar_id,
@@ -486,6 +507,15 @@ def _build_alignment_plan(
                 UnresolvedAnalysisRequirementCode.ALIGNMENT_CONTRACT_MISSING,
                 "alignment contract requires explicit strict same-session "
                 "decisions",
+            )
+        )
+        return None
+    if decisions.same_market_missing_data_policy == "keep_missing_v1":
+        unresolved.append(
+            _unresolved(
+                UnresolvedAnalysisRequirementCode.ANALYSIS_MISSING_POLICY_NOT_EXECUTABLE,
+                "keep-missing is not executable by the current analysis "
+                "engine",
             )
         )
         return None
@@ -887,6 +917,8 @@ def generate_analysis_plan(
         claim_type=research_spec.claim_type.value,
         method=research_spec.model.method.value,
         method_profile=decisions.method_profile or "unresolved",
+        include_intercept=decisions.include_intercept,
+        newey_west_max_lags=decisions.newey_west_max_lags,
         human_formula=research_spec.model.formula,
         human_null_hypothesis=research_spec.model.null_hypothesis,
         human_alternative_hypothesis=research_spec.model.alternative_hypothesis,

@@ -91,6 +91,32 @@ hashes。生成前重新调用正式 DataReadyManifest 验证。
 false。本阶段不计算统计量、不执行变换、不运行 robustness、不生成报告。
 详见 。
 
+## 分析执行（v0.4.0 Phase 2）
+
+ 消费单次授权（receipt 先于任何 Bundle 读取
+持久化），重新验证 Data Ready 链与 snapshot 绑定，复用
+ /  执行变换，
+按 strict same-session 对齐（session identity + 信息截止，可审计
+no-lookahead），并以确定性纯标准库统计（Pearson / Spearman / OLS
+classic / HC1 / Newey-West、Student-t、Fisher-z、12 位数字规范、
+multiple testing corrections）产出 。结果目录 create-only
+（staging + atomic rename + 逐文件 hash 验证）。执行器不调用 Provider、
+不联网、不读取 credential、不执行 robustness、不生成报告。详见
+。
+
+## 分析执行（v0.4.0 Phase 2）
+
+`execute_authorized_analysis` 消费单次授权（receipt 先于任何 Bundle 读取
+持久化），重新验证 Data Ready 链与 snapshot 绑定，复用
+`transform_price_bundle` / `transform_absolute_price_change` 执行变换，
+按 strict same-session 对齐（session identity + 信息截止，可审计
+no-lookahead），并以确定性纯标准库统计（Pearson / Spearman / OLS
+classic / HC1 / Newey-West、Student-t、Fisher-z、12 位数字规范、
+multiple testing corrections）产出 `AnalysisResult`。结果目录 create-only
+（staging + atomic rename + 逐文件 hash 验证）。执行器不调用 Provider、
+不联网、不读取 credential、不执行 robustness、不生成报告。详见
+`docs/analysis_execution.md`。
+
 ## 统一 data-lifecycle CLI
 
 v0.3.0 提供统一 JSON-only CLI（`market-validator data-lifecycle ...`，

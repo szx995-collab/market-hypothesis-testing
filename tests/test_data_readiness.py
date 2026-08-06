@@ -310,6 +310,7 @@ def _ready_snapshot(
     pre_sample_periods: int = 0,
     observation_dates: list[str] | None = None,
     count: int | None = None,
+    values: list[str] | None = None,
 ) -> tuple[object, dict[str, object], _SeriesAwareTransport]:
     (tmp / "snapshots").mkdir(exist_ok=True)
     transport = _SeriesAwareTransport()
@@ -323,14 +324,27 @@ def _ready_snapshot(
         "2020-01-09",
         "2020-01-10",
     ]
+    if pre_sample_periods and values is not None:
+        from market_validator.data.session_schedule import (
+            ExplicitSessionScheduleAdapter,
+        )
+
+        adapter = ExplicitSessionScheduleAdapter(_make_schedule_snapshot())
+        pre_dates = adapter.previous_sessions(
+            date(2020, 1, 1), pre_sample_periods
+        )
+        dates = [value.isoformat() for value in pre_dates] + dates
+    series_values = values or ["1.0"] * len(dates)
+    if len(series_values) < len(dates):
+        raise ValueError("not enough values for the observation dates")
     transport.pages[0] = observations_payload(
         [
             {
                 "date": value,
-                "value": "1.0",
+                "value": series_values[index],
                 "realtime_start": "2020-01-02",
             }
-            for value in dates
+            for index, value in enumerate(dates)
         ],
         count=count or len(dates),
     )
