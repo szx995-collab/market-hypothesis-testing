@@ -66,6 +66,9 @@ def _build_parser() -> argparse.ArgumentParser:
     add_workflow_parsers(subparsers)
     add_hypothesis_parsers(subparsers)
     add_data_plan_parsers(subparsers)
+    from market_validator.research_agent_cli import build_research_parser
+
+    build_research_parser(subparsers)
     return parser
 
 
@@ -102,6 +105,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     args = _build_parser().parse_args(argv)
 
+    if args.command == "research":
+        from market_validator.research_agent_cli import main as research_main
+
+        return research_main(argv[1:])
     if args.command == "data-lifecycle":
         from market_validator import data_lifecycle_cli
 
