@@ -79,6 +79,21 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 
 `spec_review` 是正式分析前的强制闸门。没有用户对数学定义、变量、样本和方法的明确确认，不得进入数据执行或分析。任何会实质改变已确认规格的情况——例如数据不可得、替代变量、时间范围变化或新增方法——都必须生成变更记录并返回用户确认。
 
+## 统一 data-lifecycle CLI
+
+v0.3.0 提供统一 JSON-only CLI（`market-validator data-lifecycle ...`，
+与 `python -m market_validator data-lifecycle ...` 等价），覆盖
+schema/validate、source-selection、acquisition、authorization、execution、
+session-schedule、readiness assess/finalize/verify。CLI 是 domain API 的薄
+适配层：不自动确认、不自动授权、不自动选择 Provider、不自动执行；
+exit codes：0 成功 / 2 无效或 blocked / 3 执行失败（授权已消费）/
+4 输出冲突 / 1 内部错误。`data fred fetch` 仅为 legacy provider diagnostic
+（`formal_lifecycle=false`），不能产生 Data Ready。
+
+`DataReadinessAssessment`/`DataReadyManifest` 为 schema 1.1，绑定完整
+expected/observed sample & pre-sample session-set SHA-256 与显式
+`ExplicitSessionScheduleSnapshot`；旧 1.0 artifact fail closed。
+
 ## 失败与中止原则
 
 - 输入不完整、规格含糊、确认缺失、数据质量不达标或计算前提不满足时，应失败关闭，不得猜测后继续。

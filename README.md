@@ -53,7 +53,18 @@ The generic `ResearchHypothesisProposal` path now supports clarification, hash-b
 - A strict, provider-neutral `ResearchHypothesisProposal` for general natural-language association/predictive questions, deterministic H0/H1 validation, explicit ambiguities, Schema, canonical JSON, SHA-256, and safe create-only output.
 - Stable ambiguity IDs, strict whitelisted clarification answers, explicit hash-bound user confirmation, and deterministic compilation to the existing `ResearchSpec` with an auditable provenance sidecar.
 
-Not implemented: automatic provider selection, online market-data workflows, general cross-market calendar alignment execution, generic correlation/regression/causal execution, backtesting, automatic confirmation/execution, or trading.
+Implemented: ResearchSpec; DataPlan (confirmed, hash-bound); SourceSelection;
+AcquisitionRequestPlan 1.2 (capability + pre-sample planning, exact FRED
+request steps); DataAccessAuthorization (single-use, no paid/retry/fallback);
+transactional acquisition snapshots; DataReadinessAssessment 1.1 and
+DataReadyManifest 1.1 with exact session-evidence binding; a unified JSON-only
+`data-lifecycle` CLI; and a TEST-ONLY synthetic offline example that reaches
+Data Ready.
+
+The formally authorized FRED / local CSV acquisition lifecycle is implemented.
+Not implemented: automatic provider selection, general cross-market calendar
+execution, generic correlation/regression/causal analysis, backtesting,
+automatic confirmation/execution, or trading.
 
 ### Quick start
 
@@ -164,6 +175,26 @@ python -m market_validator propose-plan `
   --allow-network
 ```
 
+### Quick start to Data Ready (TEST-ONLY synthetic, offline)
+
+```powershell
+python scripts\verify_v0_3_offline_example.py
+python examples\v0.3_data_ready\run_example.py --output-dir <new-empty-dir>
+```
+
+The example is fully synthetic and offline: explicit local CSV provider,
+explicit session schedule snapshot, no credentials, no network. It prints a
+summary with `status: "data_ready"` plus the manifest SHA-256.
+
+```text
+TEST-ONLY SYNTHETIC EXAMPLE · NOT MARKET DATA · NOT ANALYSIS · NOT INVESTMENT ADVICE
+```
+
+The legacy diagnostic command `market-validator data fred fetch --live`
+does NOT use DataAccessAuthorization, does NOT create a Phase 3 transactional
+snapshot, and cannot produce a DataReadyManifest. It must not be used as the
+formal `data_ready` flow — use `data-lifecycle execution run` instead.
+
 ### WTI golden case
 
 - Request ID: `fred-dcoilwtico-20260804T085757136534Z-58aa38ed3b12`
@@ -212,6 +243,16 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 - 不静默填补缺失数据、替换研究定义或绕过严格模型。
 
 ## 当前能力
+
+已实现：ResearchSpec、DataPlan（已确认、hash 绑定）、SourceSelection、
+AcquisitionRequestPlan 1.2（capability/pre-sample 规划、精确 FRED 请求步骤）、
+DataAccessAuthorization（single-use，无 paid/retry/fallback）、事务性
+acquisition snapshot、DataReadinessAssessment 1.1 与 DataReadyManifest 1.1
+（完整 session-evidence 绑定）、统一 JSON-only `data-lifecycle` CLI，以及
+TEST-ONLY 离线 synthetic 示例（可达 Data Ready）。
+
+正式授权的 FRED/local CSV acquisition lifecycle 已实现；通用 Provider
+自动选择、多市场通用 calendar execution、通用统计分析仍未实现。
 
 - Python 3.11+、`src` 布局、Pydantic v2 严格模型；Windows 通过条件依赖 `tzdata` 提供 IANA 时区数据库。
 - `ResearchSpec`、数据需求、日历和 instrument registry 契约。

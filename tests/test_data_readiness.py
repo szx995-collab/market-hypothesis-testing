@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+import tempfile
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -29,6 +30,9 @@ from market_validator.data.providers.fred_provider import (
     FredProvider,
 )
 from market_validator.data.readiness import (
+    ReadinessBlocker,
+    ReadinessErrorCode,
+    ReadinessStage,
     DataReadinessAssessment,
     ReadinessError,
     ReadinessErrorCode,
@@ -47,6 +51,12 @@ from market_validator.data.readiness import (
     verify_persisted_data_ready_manifest,
 )
 from market_validator.data.registry import InstrumentRegistry
+from market_validator.data.session_schedule import (
+    ExplicitSessionScheduleAdapter,
+    ExplicitSessionScheduleSnapshot,
+    calculate_explicit_session_schedule_snapshot_sha256,
+    canonical_session_set_sha256,
+)
 from market_validator.data.source_selection import (
     SourceSelectionDecision,
     confirm_source_selection,
@@ -122,6 +132,19 @@ class _SeriesAwareTransport(FakeTransport):
             series_id = parameters.get("series_id")
             return response(series_payload(series_id=series_id))
         return response(self.pages[int(parameters["offset"])])
+
+
+def _make_schedule_snapshot() -> ExplicitSessionScheduleSnapshot:
+    return ExplicitSessionScheduleSnapshot(
+        schedule_id="test-fixed-daily-v1",
+        calendar_id="synthetic.test.equity",
+        schedule_adapter_id=_FixedDailyAdapter.adapter_id,
+        coverage_start=date(2019, 12, 27),
+        coverage_end=date(2020, 1, 31),
+        sessions=_weekdays_between(date(2019, 12, 27), date(2020, 1, 31)),
+        verification_source_uri="https://example.invalid/schedule/fixed-daily",
+        verified_as_of=date(2026, 8, 1),
+    )
 
 
 def _calendar_registry_with_adapter() -> CalendarRegistry:
@@ -338,7 +361,9 @@ def _assess(
         instrument_registry=chain["instruments"],
         calendar_registry=chain["calendars"],
         snapshot_path=verified.snapshot_path,
-        session_adapters={_FixedDailyAdapter.adapter_id: _FixedDailyAdapter()},
+        session_schedules={
+            _FixedDailyAdapter.adapter_id: _make_schedule_snapshot()
+        },
     )
 
 
@@ -479,7 +504,7 @@ class HappyPathTest(unittest.TestCase):
             )
             self.assertEqual(
                 generated.data_ready_manifest.data_ready_schema_version,
-                "1.0",
+                "1.1",
             )
             persisted, provenance = persist_data_ready_manifest(
                 generated,
@@ -677,14 +702,25 @@ class CoverageTest(unittest.TestCase):
         with TemporaryDirectory(dir=ROOT) as directory:
             tmp = Path(directory)
             verified, chain, _ = _ready_snapshot(tmp)
+            holiday_snapshot = _make_schedule_snapshot().model_copy(
+                update={
+                    "schedule_id": "test-holiday-v1",
+                    "schedule_adapter_id": _HolidayAdapter.adapter_id,
+                    "sessions": [
+                        session
+                        for session in _make_schedule_snapshot().sessions
+                        if session != date(2020, 1, 2)
+                    ],
+                }
+            )
             assessment = assess_data_readiness(
                 generated_plan=chain["plan"],
                 data_plan=chain["data_plan"],
                 instrument_registry=chain["instruments"],
                 calendar_registry=chain["calendars"],
                 snapshot_path=verified.snapshot_path,
-                session_adapters={
-                    _FixedDailyAdapter.adapter_id: _HolidayAdapter()
+                session_schedules={
+                    _FixedDailyAdapter.adapter_id: holiday_snapshot
                 },
             )
             self.assertIn(
@@ -702,7 +738,7 @@ class CoverageTest(unittest.TestCase):
                 instrument_registry=chain["instruments"],
                 calendar_registry=chain["calendars"],
                 snapshot_path=verified.snapshot_path,
-                session_adapters={},
+                session_schedules={},
             )
             self.assertEqual(assessment.status, ReadinessStatus.BLOCKED)
             self.assertIn(
@@ -999,6 +1035,193 @@ class ReviewRegressionTest(unittest.TestCase):
             self.assertIn(
                 "latest_revision_hindsight_risk",
                 record.quality_issue_codes,
+            )
+
+
+def _core_sha256(model) -> str:
+    import hashlib
+
+    return hashlib.sha256(
+        json.dumps(
+            model.model_dump(mode="json"),
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+class Phase5SessionEvidenceTest(unittest.TestCase):
+    """Schema 1.1 session-evidence binding contract tests."""
+
+    def test_old_schema_1_0_assessment_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            assessment = _assess(Path(tmp), verified, chain)
+            legacy = assessment.model_copy(
+                update={"readiness_schema_version": "1.0"}
+            )
+            payload = json.dumps(
+                legacy.model_dump(mode="json"),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            with self.assertRaises(Exception):
+                parse_data_readiness_assessment(payload)
+
+    def test_old_schema_1_0_manifest_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            assessment = _assess(Path(tmp), verified, chain)
+            generated = create_data_ready_manifest(
+                assessment=assessment,
+                generated_plan=chain["plan"],
+            )
+            legacy = generated.data_ready_manifest.model_copy(
+                update={"data_ready_schema_version": "1.0"}
+            )
+            payload = json.dumps(
+                legacy.model_dump(mode="json"),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+            with self.assertRaises(Exception):
+                parse_data_ready_manifest(payload)
+
+    def test_full_session_set_hashes_present(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            assessment = _assess(Path(tmp), verified, chain)
+        for requirement in assessment.requirements:
+            self.assertEqual(len(requirement.session_schedule_sha256), 64)
+            self.assertEqual(
+                len(requirement.expected_sample_sessions_sha256), 64
+            )
+            self.assertEqual(
+                len(requirement.observed_sample_sessions_sha256), 64
+            )
+            self.assertEqual(
+                len(requirement.expected_pre_sample_sessions_sha256), 64
+            )
+            self.assertEqual(
+                len(requirement.observed_pre_sample_sessions_sha256), 64
+            )
+        self.assertTrue(assessment.session_schedule_sha256s)
+
+    def test_assessment_id_binds_full_core(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            base = _assess(Path(tmp), verified, chain)
+            changed = base.model_copy(
+                update={
+                    "warnings": list(base.warnings) + ["extra-warning"]
+                }
+            )
+            self.assertNotEqual(
+                _core_sha256(base), _core_sha256(changed)
+            )
+            blocker_changed = base.model_copy(
+                update={
+                    "blockers": list(base.blockers)
+                    + [
+                        ReadinessBlocker(
+                            code=ReadinessErrorCode.QUALITY_FAILED.value,
+                            stage=ReadinessStage.QUALITY_VALIDATION,
+                            message="hypothetical blocker",
+                        )
+                    ]
+                }
+            )
+            self.assertNotEqual(
+                _core_sha256(base), _core_sha256(blocker_changed)
+            )
+            requirement_changed = base.model_copy(
+                update={
+                    "requirements": [
+                        item.model_copy(
+                            update={
+                                "observed_sample_sessions_sha256": "0" * 64
+                            }
+                        )
+                        if idx == 0
+                        else item
+                        for idx, item in enumerate(base.requirements)
+                    ]
+                }
+            )
+            self.assertNotEqual(
+                _core_sha256(base), _core_sha256(requirement_changed)
+            )
+
+    def test_manifest_id_binds_bundle_records(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            assessment = _assess(Path(tmp), verified, chain)
+            base = create_data_ready_manifest(
+                assessment=assessment,
+                generated_plan=chain["plan"],
+            )
+            changed = base.data_ready_manifest.model_copy(
+                update={
+                    "bundles": [
+                        record.model_copy(
+                            update={
+                                "expected_sample_sessions_sha256": "0" * 64
+                            }
+                        )
+                        if idx == 0
+                        else record
+                        for idx, record in enumerate(
+                            base.data_ready_manifest.bundles
+                        )
+                    ]
+                }
+            )
+            self.assertNotEqual(
+                _core_sha256(base.data_ready_manifest),
+                _core_sha256(changed),
+            )
+
+    def test_schedule_change_invalidates_old_manifest(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            verified, chain, _transport = _ready_snapshot(Path(tmp))
+            assessment = _assess(Path(tmp), verified, chain)
+            generated = create_data_ready_manifest(
+                assessment=assessment,
+                generated_plan=chain["plan"],
+            )
+            schedule = _make_schedule_snapshot().model_copy(
+                update={
+                    "schedule_id": "changed-schedule",
+                    "sessions": [
+                        session
+                        for session in _make_schedule_snapshot().sessions
+                        if session != date(2020, 1, 21)
+                    ],
+                }
+            )
+            session_schedules = {
+                schedule.schedule_adapter_id: schedule
+            }
+            new_assessment = assess_data_readiness(
+                generated_plan=chain["plan"],
+                data_plan=chain["data_plan"],
+                instrument_registry=chain["instruments"],
+                calendar_registry=chain["calendars"],
+                snapshot_path=verified.snapshot_path,
+                session_schedules=session_schedules,
+            )
+            self.assertNotEqual(
+                assessment.session_schedule_sha256s,
+                new_assessment.session_schedule_sha256s,
+            )
+            new_manifest = create_data_ready_manifest(
+                assessment=new_assessment,
+                generated_plan=chain["plan"],
+            )
+            self.assertNotEqual(
+                generated.data_ready_manifest.data_ready_id,
+                new_manifest.data_ready_manifest.data_ready_id,
             )
 
 

@@ -4,8 +4,62 @@
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-08-05
+## [0.3.0] - 2026-08-06
 
+### Added
+
+- 完整 SourceSelection 生命周期：确定性 `SourceSelectionDecision`、严格验证、
+  显式 `SourceSelectionConfirmation`（固定确认语句）、provenance 与原子只创建
+  持久化；未解决需求返回结构化 unresolved requirement，绝不猜测。
+- Capability/pre-sample 请求规划：Provider capability snapshot（来自真实
+  Provider 能力事实）、acquisition window（schema 1.2，含 FRED
+  observation_start=acquisition_start）、显式 pre-sample 解析方法与未解决原因。
+- `DataAccessAuthorization`：显式 network/local-file/credential 授权布尔、
+  paid/retry/fallback 恒为 false、single-use 固定、精确 request-id 绑定；
+  `DataAccessAuthorizationReceipt` 先持久化后执行，消费后不可复用。
+- 精确 FRED 请求契约：`PublicRequestStep`（metadata + observations 两步）、
+  HTTP 参数只含 public fields、分页策略显式、旧 schema 严格 fail closed。
+- Provider execution adapters：FRED（capture 路径零重试）与 local CSV
+  （绝对路径/盘符/URI 规范化、symlink 组件拒绝、单次读取、stat 前后校验、
+  32MB 上限）；执行失败后授权仍 consumed，不允许 retry/fallback。
+- 事务性 acquisition snapshot：staging → fsync → 原子 rename、manifest 与
+  outcome 严格校验、全量 hash 绑定、verify 交叉校验、immutable 持久化。
+- `DataReadinessAssessment`/`DataReadyManifest` schema 1.1：完整 expected/
+  observed sample & pre-sample session-set SHA-256、session schedule snapshot
+  哈希绑定、assessment_id/data_ready_id 派生自完整 canonical core；
+  旧 1.0 artifact 严格拒绝。
+- `ExplicitSessionScheduleSnapshot`：精确 session 日期集合、coverage 语义、
+  固定验证声明、canonical 哈希与 create-only 持久化；adapter 只返回明确
+  列出的日期，绝不从名称/市场/星期推导。
+- 统一 JSON-only `data-lifecycle` CLI：schema/validate、source-selection、
+  acquisition、authorization、execution、session-schedule、readiness
+  assess/finalize/verify；稳定 exit codes（0/1/2/3/4）、无自动确认/授权/
+  选择/执行。
+- TEST-ONLY synthetic 离线示例 `examples/v0.3_data_ready/`（DataPlan
+  Confirmed → Data Ready，显式 local CSV + 显式 session schedule）与
+  `scripts/verify_v0_3_offline_example.py` 验收脚本。
+
+### Changed
+
+- `AcquisitionRequestPlan` schema 1.0/1.1 → 1.2（acquisition window、steps
+  进入 canonical hash、HTTP 参数净化）。
+- `DataReadinessAssessment`/`DataReadyManifest` 1.0 → 1.1（完整 session
+  evidence 绑定）；旧 artifacts 必须重新生成。
+- 正式文档只推荐 `data-lifecycle execution run`；`data fred fetch --live`
+  明确标注 legacy provider diagnostic，输出 `formal_lifecycle=false`。
+
+### Security
+
+- 正式生命周期不自动选择 Provider、不自动确认、不自动授权、不自动执行；
+  无 retry/fallback/paid 开关；credential 仅非交互解析且绝不进入 artifact。
+- schedule snapshot 不接受 Python import path、不加载任意代码、不输出
+  secret；URI 拒绝 credential；持久化拒绝 traversal/symlink/覆盖。
+- 统一 CLI 拒绝重复 JSON key、未知字段、非有限数、输出冲突，内部异常不
+  输出 traceback，secret sentinel 永不泄漏。
+- 信任边界明确：Data Ready ≠ Analysis Authorized；schedule snapshot
+  确认不是数字签名；legacy FRED live fetch ≠ 正式生命周期。
+
+## [0.2.0] - 2026-08-05
 ### Added
 
 - 独立、严格的 `ResearchHypothesisProposal`，用于从通用自然语言问题保存变量角色、概念变换、时间方向、样本/对齐草案、目标参数、H0/H1、歧义和不支持请求。
@@ -53,7 +107,7 @@
 - 完善包元数据、源码发行清单、`.gitignore` 和发布文档。
 - 为 Windows 声明 IANA 时区数据库条件依赖，确保全新安装后的 `zoneinfo` 验证可用。
 - 排除测试生成的 `.runtime_*` 目录，并在分发包验收时拒绝此类运行时产物。
-
-[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/szx995-collab/market-hypothesis-testing/releases/tag/v0.1.0

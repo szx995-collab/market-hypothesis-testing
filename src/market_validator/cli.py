@@ -53,6 +53,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "validate", help="validate a ResearchSpec JSON file"
     )
     validate_parser.add_argument("path", type=Path)
+    lifecycle_parser = subparsers.add_parser(
+        "data-lifecycle",
+        help="unified JSON-only data lifecycle CLI (v0.3.0)",
+    )
+    lifecycle_parser.add_argument(
+        "lifecycle_args",
+        nargs=argparse.REMAINDER,
+        help="subcommand arguments passed to the data-lifecycle CLI",
+    )
     add_data_parser(subparsers)
     add_workflow_parsers(subparsers)
     add_hypothesis_parsers(subparsers)
@@ -92,6 +101,11 @@ def _validation_error_payload(error: ValidationError) -> dict[str, object]:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command-line interface and return a process exit code."""
     args = _build_parser().parse_args(argv)
+
+    if args.command == "data-lifecycle":
+        from market_validator import data_lifecycle_cli
+
+        return data_lifecycle_cli.main(args.lifecycle_args)
 
     if args.command == "doctor":
         print(json.dumps({"status": "ok", "stage": "scaffold"}, sort_keys=True))

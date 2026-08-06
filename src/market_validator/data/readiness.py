@@ -16,7 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Annotated, NoReturn, Protocol
+from typing import Annotated, Literal, NoReturn, Protocol
 
 from pydantic import (
     StringConstraints,
@@ -42,6 +42,15 @@ from market_validator.data.models import (
 )
 from market_validator.data.quality import QualityStatus
 from market_validator.data.registry import InstrumentRegistry
+from market_validator.data.session_schedule import (
+    ExplicitSessionScheduleAdapter,
+    ExplicitSessionScheduleSnapshot,
+    SessionScheduleError,
+    calculate_explicit_session_schedule_snapshot_sha256,
+    canonical_session_set_sha256,
+    parse_explicit_session_schedule_snapshot,
+    serialize_explicit_session_schedule_snapshot,
+)
 from market_validator.data.snapshot import (
     AcquisitionExecutionOutcome,
     AcquisitionSnapshotManifest,
@@ -59,8 +68,8 @@ from market_validator.research.enums import (
 )
 from market_validator.research.models import StrictResearchModel
 
-READINESS_SCHEMA_VERSION = "1.0"
-DATA_READY_SCHEMA_VERSION = "1.0"
+READINESS_SCHEMA_VERSION = "1.1"
+DATA_READY_SCHEMA_VERSION = "1.1"
 Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -180,6 +189,11 @@ class RequirementReadinessAssessment(StrictResearchModel):
     pre_sample_last_expected_session: date | None
     pre_sample_first_observed_session: date | None
     pre_sample_last_observed_session: date | None
+    session_schedule_sha256: Sha256Hex
+    expected_sample_sessions_sha256: Sha256Hex
+    observed_sample_sessions_sha256: Sha256Hex
+    expected_pre_sample_sessions_sha256: Sha256Hex
+    observed_pre_sample_sessions_sha256: Sha256Hex
     availability_status: NonEmptyString
     revision_status: NonEmptyString
     status: ReadinessStatus
@@ -188,7 +202,7 @@ class RequirementReadinessAssessment(StrictResearchModel):
 
 
 class DataReadinessAssessment(StrictResearchModel):
-    readiness_schema_version: str = "1.0"
+    readiness_schema_version: Literal["1.1"] = "1.1"
     assessment_id: NonEmptyString
     status: ReadinessStatus
     snapshot_id: NonEmptyString
@@ -201,6 +215,7 @@ class DataReadinessAssessment(StrictResearchModel):
     source_selection_confirmation_sha256: Sha256Hex
     instrument_registry_sha256: Sha256Hex
     calendar_registry_sha256: Sha256Hex
+    session_schedule_sha256s: dict[str, Sha256Hex]
     requirements: list[RequirementReadinessAssessment]
     blockers: list[ReadinessBlocker]
     warnings: list[NonEmptyString]
@@ -245,6 +260,11 @@ class DataReadyBundleRecord(StrictResearchModel):
     source_content_sha256: Sha256Hex
     quality_status: NonEmptyString
     quality_issue_codes: list[NonEmptyString]
+    session_schedule_sha256: Sha256Hex
+    expected_sample_sessions_sha256: Sha256Hex
+    observed_sample_sessions_sha256: Sha256Hex
+    expected_pre_sample_sessions_sha256: Sha256Hex
+    observed_pre_sample_sessions_sha256: Sha256Hex
     observation_count: int
     sample_session_count: int
     pre_sample_session_count: int
@@ -252,7 +272,7 @@ class DataReadyBundleRecord(StrictResearchModel):
 
 
 class DataReadyManifest(StrictResearchModel):
-    data_ready_schema_version: str = "1.0"
+    data_ready_schema_version: Literal["1.1"] = "1.1"
     data_ready_id: NonEmptyString
     readiness_assessment_sha256: Sha256Hex
     snapshot_id: NonEmptyString
@@ -265,6 +285,7 @@ class DataReadyManifest(StrictResearchModel):
     source_selection_confirmation_sha256: Sha256Hex
     instrument_registry_sha256: Sha256Hex
     calendar_registry_sha256: Sha256Hex
+    session_schedule_sha256s: dict[str, Sha256Hex]
     bundles: list[DataReadyBundleRecord]
     warnings: list[NonEmptyString]
 
@@ -428,40 +449,16 @@ def calculate_data_ready_manifest_sha256(manifest: DataReadyManifest) -> str:
     return _sha256_hex(serialize_data_ready_manifest(manifest))
 
 
-def _derive_assessment_id(
-    snapshot_manifest_sha256: str,
-    plan_sha256: str,
-    data_plan_sha256: str,
-) -> str:
-    identity = json.dumps(
-        {
-            "snapshot_manifest_sha256": snapshot_manifest_sha256,
-            "acquisition_request_plan_sha256": plan_sha256,
-            "data_plan_sha256": data_plan_sha256,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return _sha256_hex(identity)[:32]
+def _derive_assessment_id(core: DataReadinessAssessment) -> str:
+    """Derive the assessment id from the canonical core (minus the id)."""
+    without_id = core.model_copy(update={"assessment_id": "pending"})
+    return _sha256_hex(serialize_data_readiness_assessment(without_id))[:32]
 
 
-def _derive_data_ready_id(
-    assessment_sha256: str,
-    snapshot_manifest_sha256: str,
-    plan_sha256: str,
-) -> str:
-    identity = json.dumps(
-        {
-            "readiness_assessment_sha256": assessment_sha256,
-            "snapshot_manifest_sha256": snapshot_manifest_sha256,
-            "acquisition_request_plan_sha256": plan_sha256,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-    return _sha256_hex(identity)[:32]
+def _derive_data_ready_id(core: DataReadyManifest) -> str:
+    """Derive the manifest id from the canonical core (minus the id)."""
+    without_id = core.model_copy(update={"data_ready_id": "pending"})
+    return _sha256_hex(serialize_data_ready_manifest(without_id))[:32]
 
 
 def _validate_plan_and_bindings(
@@ -801,9 +798,9 @@ def _evaluate_quality(
 def _resolve_schedule_adapter(
     requirement: DataRequirement,
     calendar_registry: CalendarRegistry,
-    session_adapters: dict[str, VerifiedSessionScheduleAdapter],
+    session_schedules: dict[str, ExplicitSessionScheduleSnapshot],
     blockers: list[ReadinessBlocker],
-) -> VerifiedSessionScheduleAdapter | None:
+) -> ExplicitSessionScheduleAdapter | None:
     calendar_id = requirement.calendar_id
     if calendar_id is None:
         blockers.append(
@@ -824,13 +821,25 @@ def _resolve_schedule_adapter(
             )
         )
         return None
-    adapter = session_adapters.get(calendar.schedule_adapter)
-    if adapter is None:
+    snapshot = session_schedules.get(calendar.schedule_adapter)
+    if snapshot is None:
         blockers.append(
             ReadinessBlocker(
                 code=ReadinessErrorCode.SAMPLE_COVERAGE_UNVERIFIABLE.value,
                 stage=ReadinessStage.SAMPLE_COVERAGE,
-                message="no schedule adapter was injected for the calendar",
+                message="no explicit session schedule was provided for the "
+                "calendar",
+            )
+        )
+        return None
+    try:
+        adapter = ExplicitSessionScheduleAdapter(snapshot)
+    except SessionScheduleError:
+        blockers.append(
+            ReadinessBlocker(
+                code=ReadinessErrorCode.SAMPLE_COVERAGE_UNVERIFIABLE.value,
+                stage=ReadinessStage.SAMPLE_COVERAGE,
+                message="session schedule snapshot is not canonical",
             )
         )
         return None
@@ -856,7 +865,8 @@ def _assess_requirement(
     snapshot_path: Path,
     record,
     calendar_registry: CalendarRegistry,
-    session_adapters: dict[str, VerifiedSessionScheduleAdapter],
+    session_schedules: ExplicitSessionScheduleAdapter | None,
+    session_schedule_sha256: str,
 ) -> RequirementReadinessAssessment:
     blockers: list[ReadinessBlocker] = []
     warnings: list[str] = []
@@ -882,9 +892,15 @@ def _assess_requirement(
     sample_last_expected: date | None = None
     sample_first_observed: date | None = None
     sample_last_observed: date | None = None
-    adapter = _resolve_schedule_adapter(
-        requirement, calendar_registry, session_adapters, blockers
-    )
+    adapter = session_schedules
+    if adapter is None:
+        blockers.append(
+            ReadinessBlocker(
+                code=ReadinessErrorCode.SAMPLE_COVERAGE_UNVERIFIABLE.value,
+                stage=ReadinessStage.SAMPLE_COVERAGE,
+                message="no verified session schedule is available",
+            )
+        )
     if adapter is not None:
         try:
             expected_sample = adapter.sessions_between(
@@ -1346,6 +1362,16 @@ def _assess_requirement(
         )
         revision_status = "blocked"
 
+    expected_sample_sessions = (
+        expected_sample if "expected_sample" in dir() else []
+    )
+    observed_sample_sessions = (
+        observed_sample if "observed_sample" in dir() else []
+    )
+    expected_pre_sample_sessions = (
+        expected_pre_sample if "expected_pre_sample" in dir() else []
+    )
+    observed_pre_sample_sessions = pre_sample_observations
     status = (
         ReadinessStatus.BLOCKED if blockers else ReadinessStatus.READY
     )
@@ -1376,6 +1402,19 @@ def _assess_requirement(
         pre_sample_last_observed_session=pre_sample_last_observed,
         availability_status=availability_status,
         revision_status=revision_status,
+        session_schedule_sha256=session_schedule_sha256,
+        expected_sample_sessions_sha256=canonical_session_set_sha256(
+            expected_sample_sessions
+        ),
+        observed_sample_sessions_sha256=canonical_session_set_sha256(
+            observed_sample_sessions
+        ),
+        expected_pre_sample_sessions_sha256=canonical_session_set_sha256(
+            expected_pre_sample_sessions
+        ),
+        observed_pre_sample_sessions_sha256=canonical_session_set_sha256(
+            observed_pre_sample_sessions
+        ),
         status=status,
         blockers=blockers,
         warnings=sorted(set(warnings)),
@@ -1389,7 +1428,7 @@ def assess_data_readiness(
     instrument_registry: InstrumentRegistry,
     calendar_registry: CalendarRegistry,
     snapshot_path: str | Path,
-    session_adapters: dict[str, VerifiedSessionScheduleAdapter],
+    session_schedules: dict[str, ExplicitSessionScheduleSnapshot],
     expected_authorization_sha256: str | None = None,
     expected_receipt_sha256: str | None = None,
 ) -> DataReadinessAssessment:
@@ -1541,6 +1580,19 @@ def assess_data_readiness(
                 "recomputed source content hash does not match the bundle",
                 requirement_id=requirement.requirement_id,
             )
+        requirement_adapter = _resolve_schedule_adapter(
+            requirement,
+            calendar_registry,
+            session_schedules,
+            [],
+        )
+        requirement_schedule_sha256 = "0" * 64
+        if requirement_adapter is not None:
+            requirement_schedule_sha256 = (
+                calculate_explicit_session_schedule_snapshot_sha256(
+                    requirement_adapter.snapshot
+                )
+            )
         assessment = _assess_requirement(
             requirement,
             request,
@@ -1549,12 +1601,19 @@ def assess_data_readiness(
             verified.snapshot_path,
             record,
             calendar_registry,
-            session_adapters,
+            requirement_adapter,
+            requirement_schedule_sha256,
         )
         requirement_assessments.append(assessment)
         aggregate_blockers.extend(assessment.blockers)
         aggregate_warnings.extend(assessment.warnings)
 
+    session_schedule_sha256s = {
+        adapter_id: calculate_explicit_session_schedule_snapshot_sha256(
+            snapshot
+        )
+        for adapter_id, snapshot in session_schedules.items()
+    }
     assessment = DataReadinessAssessment(
         assessment_id="pending",
         status=(
@@ -1580,15 +1639,12 @@ def assess_data_readiness(
             generated_plan.instrument_registry_sha256
         ),
         calendar_registry_sha256=generated_plan.calendar_registry_sha256,
+        session_schedule_sha256s=session_schedule_sha256s,
         requirements=requirement_assessments,
         blockers=aggregate_blockers,
         warnings=aggregate_warnings,
     )
-    assessment_id = _derive_assessment_id(
-        assessment.snapshot_manifest_sha256,
-        assessment.acquisition_request_plan_sha256,
-        assessment.data_plan_sha256,
-    )
+    assessment_id = _derive_assessment_id(assessment)
     return assessment.model_copy(update={"assessment_id": assessment_id})
 
 
@@ -1633,11 +1689,7 @@ def create_data_ready_manifest(
                 "assessment requirement is not ready",
                 requirement_id=item.requirement_id,
             )
-    expected_id = _derive_assessment_id(
-        assessment.snapshot_manifest_sha256,
-        assessment.acquisition_request_plan_sha256,
-        assessment.data_plan_sha256,
-    )
+    expected_id = _derive_assessment_id(assessment)
     if assessment.assessment_id != expected_id:
         fail_readiness(
             ReadinessErrorCode.INVALID_DATA_READINESS_INPUT,
@@ -1655,6 +1707,19 @@ def create_data_ready_manifest(
             source_content_sha256=item.source_content_sha256,
             quality_status=item.quality_status,
             quality_issue_codes=list(item.quality_issue_codes),
+            session_schedule_sha256=item.session_schedule_sha256,
+            expected_sample_sessions_sha256=(
+                item.expected_sample_sessions_sha256
+            ),
+            observed_sample_sessions_sha256=(
+                item.observed_sample_sessions_sha256
+            ),
+            expected_pre_sample_sessions_sha256=(
+                item.expected_pre_sample_sessions_sha256
+            ),
+            observed_pre_sample_sessions_sha256=(
+                item.observed_pre_sample_sessions_sha256
+            ),
             observation_count=item.observation_count,
             sample_session_count=item.sample_observed_sessions,
             pre_sample_session_count=item.pre_sample_observed_sessions,
@@ -1681,14 +1746,11 @@ def create_data_ready_manifest(
         ),
         instrument_registry_sha256=assessment.instrument_registry_sha256,
         calendar_registry_sha256=assessment.calendar_registry_sha256,
+        session_schedule_sha256s=assessment.session_schedule_sha256s,
         bundles=bundle_records,
         warnings=assessment.warnings,
     )
-    data_ready_id = _derive_data_ready_id(
-        assessment_sha256,
-        manifest.snapshot_manifest_sha256,
-        manifest.acquisition_request_plan_sha256,
-    )
+    data_ready_id = _derive_data_ready_id(manifest)
     manifest = manifest.model_copy(update={"data_ready_id": data_ready_id})
     manifest_sha256 = calculate_data_ready_manifest_sha256(manifest)
     return GeneratedDataReadyManifest(
@@ -1792,6 +1854,14 @@ def validate_data_ready_manifest_matches(
                 ReadinessStage.MANIFEST_VERIFICATION,
                 f"manifest {field_name} does not match the assessment",
             )
+    if manifest.session_schedule_sha256s != (
+        assessment.session_schedule_sha256s
+    ):
+        fail_readiness(
+            ReadinessErrorCode.DATA_READY_MANIFEST_MISMATCH,
+            ReadinessStage.MANIFEST_VERIFICATION,
+            "manifest session schedule hashes do not match the assessment",
+        )
     if manifest.warnings != assessment.warnings:
         fail_readiness(
             ReadinessErrorCode.DATA_READY_MANIFEST_MISMATCH,
@@ -1823,6 +1893,19 @@ def validate_data_ready_manifest_matches(
             "source_content_sha256": item.source_content_sha256,
             "quality_status": item.quality_status,
             "quality_issue_codes": item.quality_issue_codes,
+            "session_schedule_sha256": item.session_schedule_sha256,
+            "expected_sample_sessions_sha256": (
+                item.expected_sample_sessions_sha256
+            ),
+            "observed_sample_sessions_sha256": (
+                item.observed_sample_sessions_sha256
+            ),
+            "expected_pre_sample_sessions_sha256": (
+                item.expected_pre_sample_sessions_sha256
+            ),
+            "observed_pre_sample_sessions_sha256": (
+                item.observed_pre_sample_sessions_sha256
+            ),
             "observation_count": item.observation_count,
             "sample_session_count": item.sample_observed_sessions,
             "pre_sample_session_count": item.pre_sample_observed_sessions,
@@ -1837,6 +1920,19 @@ def validate_data_ready_manifest_matches(
             "source_content_sha256": record.source_content_sha256,
             "quality_status": record.quality_status,
             "quality_issue_codes": record.quality_issue_codes,
+            "session_schedule_sha256": record.session_schedule_sha256,
+            "expected_sample_sessions_sha256": (
+                record.expected_sample_sessions_sha256
+            ),
+            "observed_sample_sessions_sha256": (
+                record.observed_sample_sessions_sha256
+            ),
+            "expected_pre_sample_sessions_sha256": (
+                record.expected_pre_sample_sessions_sha256
+            ),
+            "observed_pre_sample_sessions_sha256": (
+                record.observed_pre_sample_sessions_sha256
+            ),
             "observation_count": record.observation_count,
             "sample_session_count": record.sample_session_count,
             "pre_sample_session_count": record.pre_sample_session_count,
