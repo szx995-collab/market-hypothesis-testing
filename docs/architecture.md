@@ -79,6 +79,18 @@ CalendarRegistry 当前只管理内部身份和 IANA 时区，不计算真实交
 
 `spec_review` 是正式分析前的强制闸门。没有用户对数学定义、变量、样本和方法的明确确认，不得进入数据执行或分析。任何会实质改变已确认规格的情况——例如数据不可得、替代变量、时间范围变化或新增方法——都必须生成变更记录并返回用户确认。
 
+## 分析规划与授权（v0.4.0 Phase 1）
+
+（schema 1.0）把 ResearchSpec + 已验证 DataReadyManifest +
+显式  编译为不可变执行合同：method profile、
+transformation profiles、alignment plan（no-lookahead）、primary tests、
+multiple testing plan、variable-to-bundle bindings 与全部上游 canonical
+hashes。生成前重新调用正式 DataReadyManifest 验证。
+绑定一个精确 plan；（single-use）只允许一次确定性
+执行尝试，robustness/report/network/provider/mutation/retry/fallback 恒为
+false。本阶段不计算统计量、不执行变换、不运行 robustness、不生成报告。
+详见 。
+
 ## 统一 data-lifecycle CLI
 
 v0.3.0 提供统一 JSON-only CLI（`market-validator data-lifecycle ...`，
