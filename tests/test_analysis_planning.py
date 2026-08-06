@@ -40,7 +40,15 @@ from market_validator.research.serialization import (
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _make_context(tmp: Path, *, method: ModelMethod = ModelMethod.PEARSON_CORRELATION):
+def _make_context(
+    tmp: Path,
+    *,
+    method: ModelMethod = ModelMethod.PEARSON_CORRELATION,
+    outcome_transformation=None,
+    predictor_transformation=None,
+    minimum_observations=None,
+    observation_values=None,
+):
     """Build a verified Data Ready chain plus a spec, returning inputs."""
     from tests.test_data_readiness import (
         _calendar_registry_with_adapter,
@@ -55,14 +63,63 @@ def _make_context(tmp: Path, *, method: ModelMethod = ModelMethod.PEARSON_CORREL
     )
     from market_validator.research.serialization import parse_research_spec
 
-    verified, chain, _transport = _ready_snapshot(tmp)
     from tests.test_data_readiness import _short_window_spec
+    from market_validator.research.enums import Transformation as _T
+
+    base_spec = _short_window_spec()
+    transformed_needs_pre_sample = any(
+        transformation
+        in (
+            _T.SIMPLE_RETURN,
+            _T.LOG_RETURN,
+            _T.DIFFERENCE,
+        )
+        for transformation in (
+            outcome_transformation,
+            predictor_transformation,
+        )
+        if transformation is not None
+    )
+    verified, chain, _transport = _ready_snapshot(
+        tmp,
+        pre_sample_periods=1 if transformed_needs_pre_sample else 0,
+        values=observation_values,
+    )
 
     spec = _short_window_spec()
-    if method is not ModelMethod.PEARSON_CORRELATION:
-        spec = spec.model_copy(
-            update={"model": spec.model.model_copy(update={"method": method})}
-        )
+    needs_rebuild = method is not ModelMethod.PEARSON_CORRELATION or (
+        outcome_transformation is not None
+        or predictor_transformation is not None
+        or minimum_observations is not None
+    )
+    if needs_rebuild:
+        updates = {}
+        if method is not ModelMethod.PEARSON_CORRELATION:
+            updates["model"] = spec.model.model_copy(
+                update={"method": method}
+            )
+        outcome = spec.outcome
+        if outcome_transformation is not None:
+            outcome = outcome.model_copy(
+                update={"transformation": outcome_transformation}
+            )
+        predictors = spec.predictors
+        if predictor_transformation is not None:
+            predictors = [
+                predictor.model_copy(
+                    update={
+                        "transformation": predictor_transformation
+                    }
+                )
+                for predictor in predictors
+            ]
+        updates["outcome"] = outcome
+        updates["predictors"] = predictors
+        if minimum_observations is not None:
+            updates["sample"] = spec.sample.model_copy(
+                update={"minimum_observations": minimum_observations}
+            )
+        spec = spec.model_copy(update=updates)
         # ResearchSpec is immutable once bound; rebuild the chain for a
         # different method so the manifest binds the new spec hash.
         calendars = chain["calendars"]
@@ -112,7 +169,7 @@ def _make_context(tmp: Path, *, method: ModelMethod = ModelMethod.PEARSON_CORREL
             chain["capabilities"],
             session_adapters={
                 _make_schedule_snapshot().schedule_adapter_id: (
-                    lambda start, periods: None
+                    _make_session_adapter_callback()
                 )
             },
         )
@@ -167,13 +224,38 @@ def _make_context(tmp: Path, *, method: ModelMethod = ModelMethod.PEARSON_CORREL
         "manifest": manifest.data_ready_manifest,
         "generated_manifest": manifest,
         "chain": chain,
+        "verified": verified,
     }
 
 
-def _decisions(spec, *, method_profile=METHOD_PROFILE_PEARSON, **overrides):
+def _make_session_adapter_callback():
+    from tests.test_data_readiness import _make_schedule_snapshot
+    from market_validator.data.session_schedule import (
+        ExplicitSessionScheduleAdapter,
+    )
+
+    schedule = _make_schedule_snapshot()
+    adapter = ExplicitSessionScheduleAdapter(schedule)
+    return lambda start, periods: adapter.previous_sessions(
+        start, periods
+    )[-1]
+
+
+def _decisions(
+    spec,
+    *,
+    method_profile=METHOD_PROFILE_PEARSON,
+    transformation_profiles=None,
+    **overrides,
+):
     variables = [spec.outcome] + spec.predictors + spec.controls
+    transformation_profiles = transformation_profiles or {}
     transformation_decisions = {
-        variable.variable_id: _transformation_decision(variable)
+        variable.variable_id: _transformation_decision(
+            variable, profile=transformation_profiles.get(
+                variable.variable_id, TRANSFORMATION_PROFILE_LEVEL
+            )
+        )
         for variable in variables
     }
     is_correlation = method_profile in (
@@ -210,12 +292,12 @@ def _decisions(spec, *, method_profile=METHOD_PROFILE_PEARSON, **overrides):
     return AnalysisPlanDecisions(**payload)
 
 
-def _transformation_decision(variable):
+def _transformation_decision(variable, *, profile=TRANSFORMATION_PROFILE_LEVEL):
     from market_validator.analysis.planning import TransformationDecision
 
     return TransformationDecision(
         variable_id=variable.variable_id,
-        profile=TRANSFORMATION_PROFILE_LEVEL,
+        profile=profile,
         lag_periods=variable.lag_periods,
         availability_lag_periods=variable.availability_lag_periods,
         required_pre_sample_periods=0,

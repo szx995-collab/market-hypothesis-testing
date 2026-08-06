@@ -130,6 +130,10 @@ class UnresolvedAnalysisRequirementCode:
         "minimum_observation_contract_invalid"
     )
     ROBUSTNESS_EXECUTION_NOT_PLANNED = "robustness_execution_not_planned"
+    ANALYSIS_MISSING_POLICY_NOT_EXECUTABLE = (
+        "analysis_missing_policy_not_executable"
+    )
+    INFORMATION_CUTOFF_NOT_EXECUTABLE = "information_cutoff_not_executable"
 
 
 class AnalysisPlanningError(ValueError):
@@ -363,6 +367,8 @@ class AnalysisPlan(StrictResearchModel):
     claim_type: str
     method: str
     method_profile: str
+    include_intercept: bool | None = None
+    newey_west_max_lags: int | None = Field(default=None, ge=0)
     human_formula: str
     human_null_hypothesis: str
     human_alternative_hypothesis: str

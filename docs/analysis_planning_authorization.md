@@ -173,6 +173,15 @@ warning 而不是 readiness blocker。
 Confirmation 与 authorization 的 SHA-256 绑定是内容完整性证明，不是数字
 签名、不是用户对结果的认可、不是显著性判断。
 
+## 21. 执行边界（Phase 2 合同）
+
+`keep_missing_v1` 不可执行 → Draft（`analysis_missing_policy_not_executable`）；
+`before_target_open` / `before_target_close` 信息截止无精确 session-time
+合同 → Draft（`information_cutoff_not_executable`）。执行器只接受
+`drop_observation_v1` / `error_v1` 与 `information_cutoff = null` /
+`specified_local_time`。OLSR 的 intercept 与 Newey-West max lag 是显式
+plan 记录的执行决策（无隐藏默认）。详见 `docs/analysis_execution.md`。
+
 ## 20. Result Verified ≠ 投资建议
 
 即使未来某阶段产生 verified result，也绝不等于投资建议；系统不执行真实

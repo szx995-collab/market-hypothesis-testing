@@ -55,7 +55,11 @@ The generic `ResearchHypothesisProposal` path now supports clarification, hash-b
 
 Implemented: ResearchSpec; DataPlan (confirmed, hash-bound); SourceSelection;
 AnalysisPlan / AnalysisAuthorization contract (planning + authorization only,
-no analysis execution);
+no analysis execution); authorized deterministic analysis execution
+(Pearson / Spearman / OLS with classic, HC1 and Newey-West covariance,
+session-based alignment, no-lookahead, immutable result directories); authorized deterministic analysis execution
+(Pearson / Spearman / OLS with classic, HC1 and Newey-West covariance,
+session-based alignment, no-lookahead, immutable result directories);
 AcquisitionRequestPlan 1.2 (capability + pre-sample planning, exact FRED
 request steps); DataAccessAuthorization (single-use, no paid/retry/fallback);
 transactional acquisition snapshots; DataReadinessAssessment 1.1 and
@@ -248,6 +252,10 @@ GitHub Actions runs security auditing, offline tests, two reproducibility builds
 
 已实现：ResearchSpec、DataPlan（已确认、hash 绑定）、SourceSelection、
 AnalysisPlan / AnalysisAuthorization 合同（仅规划与授权，未执行任何分析）、
+授权确定性分析执行（Pearson / Spearman / OLS classic、HC1、Newey-West，
+基于 session 的对齐，no-lookahead，不可变结果目录）、
+授权确定性分析执行（Pearson / Spearman / OLS classic、HC1、Newey-West，
+基于 session 的对齐，no-lookahead，不可变结果目录）、
 AcquisitionRequestPlan 1.2（capability/pre-sample 规划、精确 FRED 请求步骤）、
 DataAccessAuthorization（single-use，无 paid/retry/fallback）、事务性
 acquisition snapshot、DataReadinessAssessment 1.1 与 DataReadyManifest 1.1
