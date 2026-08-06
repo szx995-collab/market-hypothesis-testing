@@ -4,7 +4,31 @@
 
 ## [Unreleased]
 
-## [0.3.0] - 2026-08-06
+## [0.4.0] - 2026-08-06
+
+### Added
+
+- 个人 Research Agent CLI：`research start / status / resume / revise`，
+  可恢复 ResearchSession（不可变 revision、hash 绑定 artifact、显式确认与
+  single-use authorization、中断恢复幂等）。
+- 数据缺口与接口需求提示：缺 verified provider mapping、数据接口配置、
+  local CSV 或 Provider credential 时明确告知，不假装已找到数据源。
+- AnalysisPlan confirmation 与 single-use authorization：一次确定性执行
+  尝试，消费后不自动重试。
+- 通用统计分析：Pearson、Spearman、OLS（classic / HC1 / Newey-West），
+  session-based 严格对齐与 no-lookahead，AnalysisResult 可验证持久化。
+- grounded LLM interpretation：证据绑定、数字由代码渲染、Markdown
+  验证报告，默认不联网。
+- 用户级离线端到端示例 （synthetic CSV +
+  fixture LLM，不联网、不需要 API key）与 release-only 验证脚本
+  。
+- 个人使用 Quickstart 文档（README 与 docs/research_agent.md）。
+
+### Changed
+
+- 包版本升级到 0.4.0。
+
+
 
 ### Added
 
@@ -107,7 +131,8 @@
 - 完善包元数据、源码发行清单、`.gitignore` 和发布文档。
 - 为 Windows 声明 IANA 时区数据库条件依赖，确保全新安装后的 `zoneinfo` 验证可用。
 - 排除测试生成的 `.runtime_*` 目录，并在分发包验收时拒绝此类运行时产物。
-[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/szx995-collab/market-hypothesis-testing/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/szx995-collab/market-hypothesis-testing/releases/tag/v0.1.0

@@ -520,3 +520,69 @@ market-validator research resume --session .\research-001
 报告输出在 `final/validation-report.md`。Agent 不会自动确认、授权、
 联网或消费 single-use authorization；每一步需要用户决定时都会停下来
 说明原因。
+
+### 个人使用 Quickstart
+
+安装：
+
+```powershell
+python -m pip install -e .
+```
+
+配置假设与解释 LLM（真实环境变量，见 `src/market_validator/backends/`）：
+
+```text
+DEEPSEEK_API_KEY=<你的 key>
+DEEPSEEK_BASE_URL=<默认 https://api.deepseek.com>
+DEEPSEEK_MODEL=<默认模型名>
+```
+
+开始研究：
+
+```powershell
+market-validator research start `
+  --question "你的自然语言市场假设" `
+  --workspace .\my-research `
+  --provider deepseek_api `
+  --model <MODEL> `
+  --allow-llm-network
+```
+
+查看与继续：
+
+```powershell
+market-validator research status --session .\my-research
+market-validator research resume --session .\my-research
+```
+
+数据缺口：Agent 可能要求 verified provider mapping、数据接口配置、
+local CSV 或 Provider credential；缺什么会明确告诉你需要什么。
+
+修改并重新研究：
+
+```powershell
+market-validator research revise `
+  --session .\my-research `
+  --instruction "把样本改成二〇二一年以后" `
+  --workspace .\my-research-revised `
+  --provider deepseek_api `
+  --model <MODEL> `
+  --allow-llm-network
+```
+
+当前限制：
+
+```text
+只会使用已有 verified mapping
+不会任意搜索互联网数据源
+缺接口时会告诉用户需要什么
+不自动确认或授权
+不执行 robustness
+不提供投资建议
+```
+
+离线演示（不联网、不需要 API key）：
+
+```powershell
+python examples\v0.4_research_agent\run_example.py --output .\research-demo
+```
