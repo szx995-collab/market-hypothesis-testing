@@ -461,6 +461,8 @@ class LLMClientTest(unittest.TestCase):
                 )
         finally:
             server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
         self.assertEqual(
             raw["acknowledged_overall_conclusion"], "inconclusive"
         )
@@ -505,6 +507,8 @@ class LLMClientTest(unittest.TestCase):
                     )
         finally:
             server.shutdown()
+            server.server_close()
+            thread.join(timeout=5)
         self.assertEqual(
             caught.exception.code,
             InterpretationErrorCode.LLM_REQUEST_FAILED,
