@@ -134,7 +134,8 @@ def _synthetic_templates() -> dict[str, object]:
         RequestMethod,
     )
 
-    def template(requirement: DataPlan, symbol: str):
+    def template(requirement: DataPlan, symbol: str, acquisition_start, acquisition_end):
+        effective_start = acquisition_start or requirement.start_date
         return [
             PublicRequestStep(
                 step_id="synthetic-observations",
@@ -143,8 +144,8 @@ def _synthetic_templates() -> dict[str, object]:
                 endpoint="/synthetic/series",
                 public_parameters={
                     "series_id": symbol,
-                    "observation_start": requirement.start_date.isoformat(),
-                    "observation_end": requirement.end_date.isoformat(),
+                    "observation_start": effective_start.isoformat(),
+                    "observation_end": acquisition_end.isoformat(),
                 },
                 pagination_policy=PaginationPolicy.NONE,
             )
@@ -681,9 +682,9 @@ class AcquisitionRequestStrictJsonTest(unittest.TestCase):
             separators=(",", ":"),
         )
         raw = raw.replace(
-            '"acquisition_request_schema_version":"1.1"',
-            '"acquisition_request_schema_version":"1.1",'
-            '"acquisition_request_schema_version":"1.1"',
+            '"acquisition_request_schema_version":"1.2"',
+            '"acquisition_request_schema_version":"1.2",'
+            '"acquisition_request_schema_version":"1.2"',
             1,
         )
         with self.assertRaises(AcquisitionRequestReviewError):
@@ -706,7 +707,7 @@ class AcquisitionRequestStrictJsonTest(unittest.TestCase):
             separators=(",", ":"),
         )
         injected = raw.replace(
-            '"acquisition_request_schema_version":"1.1"',
+            '"acquisition_request_schema_version":"1.2"',
             '"acquisition_request_schema_version":NaN',
             1,
         )

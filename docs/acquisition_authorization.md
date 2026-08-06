@@ -1,4 +1,4 @@
-# Acquisition Request 与 Data Access Authorization（v0.3.0 Phase 2）
+# Acquisition Request 与 Data Access Authorization（v0.3.0 Phase 2/3/4）
 
 ## 1. workflow 位置
 
@@ -6,9 +6,20 @@
 hypothesis_draft → spec_review → data_plan → source_selection
 → acquisition_request   ← 本阶段
 → data_access_authorization
-→ provider_execution（未授权）
+→ provider_execution（Phase 3 已实现）
+→ data_readiness（Phase 4 已实现）
 → data_ready
 ```
+
+acquisition request schema 已从 `1.0` 升为 `1.1`（Phase 3）再到 `1.2`
+（Phase 4）：每个 provider requirement 表达为有序 `PublicRequestStep`
+（method / endpoint / public_parameters / pagination_policy），FRED 至少绑定
+`/fred/series` 与 `/fred/series/observations` 两个 step，HTTP 参数不含
+`revision_policy` 等非网络字段。`1.2` 起 `observation_start =
+request.acquisition_start`，pre-sample observation 被正式请求并保留进 Bundle。
+**旧 `1.0`/`1.1` artifact 严格 fail closed，必须重新生成。**
+`DataAccessAuthorization` 绑定新的 plan hash。详见
+`docs/provider_execution_snapshot.md` 与 `docs/data_readiness.md`。
 
 本阶段只推进：
 

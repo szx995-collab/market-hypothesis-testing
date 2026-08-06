@@ -417,7 +417,10 @@ class FredExecutionAdapter:
             )
         provider = self._provider
         expected_steps = provider.render_public_steps(
-            requirement, request.provider_symbol
+            requirement,
+            request.provider_symbol,
+            acquisition_start=request.acquisition_start,
+            acquisition_end=request.acquisition_end,
         )
         _compare_steps(request, expected_steps)
         credential = provider.resolve_credential_noninteractive()

@@ -26,7 +26,12 @@ DataAccess Authorized
 
 It does **not** reach `data_ready`.
 
-## Exact request steps (schema 1.1)
+## Exact request steps (schema 1.2)
+
+Schema  was superseded by  in Phase 4: FRED HTTP steps now bind the
+acquisition window (), so
+pre-sample observations are requested and retained in the Bundle. Old
+and  artifacts fail closed; Phase 2/3 artifacts must be regenerated.
 
 Every provider requirement is now expressed as ordered `PublicRequestStep`
 entries inside the acquisition request plan (schema `1.1`). Each step binds:

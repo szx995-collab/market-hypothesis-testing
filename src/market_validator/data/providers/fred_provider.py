@@ -319,7 +319,11 @@ class FredProvider:
         return parameters
 
     def render_public_steps(
-        self, requirement: DataRequirement, series_id: str
+        self,
+        requirement: DataRequirement,
+        series_id: str,
+        acquisition_start: date | None = None,
+        acquisition_end: date | None = None,
     ) -> list[dict[str, object]]:
         """Render the exact public steps the FRED contract requires.
 
@@ -335,6 +339,14 @@ class FredProvider:
         observation_parameters = self._public_observation_parameters(
             requirement, series_id
         )
+        if acquisition_start is not None:
+            observation_parameters["observation_start"] = (
+                acquisition_start.isoformat()
+            )
+        if acquisition_end is not None:
+            observation_parameters["observation_end"] = (
+                acquisition_end.isoformat()
+            )
         observation_parameters["limit"] = str(FRED_PAGE_LIMIT)
         observation_parameters = {
             key: (str(value) if isinstance(value, (int, float)) else value)
@@ -440,7 +452,11 @@ class FredProvider:
             )
         retrieved_at = clock_value.astimezone(timezone.utc)
         observations, quality = self._normalize_observations(
-            records, requirement, retrieved_at
+            records,
+            requirement,
+            retrieved_at,
+            selection_start=request.acquisition_start,
+            selection_end=request.acquisition_end,
         )
         combined_sha256 = self._combined_sha256(raw_observation_pages)
         source = DataSourceMetadata(
@@ -650,6 +666,9 @@ class FredProvider:
         records: list[dict[str, Any]],
         requirement: DataRequirement,
         retrieved_at: datetime,
+        *,
+        selection_start: date | None = None,
+        selection_end: date | None = None,
     ) -> tuple[list[Observation], DataQualityReport]:
         issues: list[DataQualityIssue] = []
         rows: list[ObservationRow] = []
@@ -769,6 +788,8 @@ class FredProvider:
             observation_rows=rows,
             initial_issues=issues,
             requirement=requirement,
+            selection_start=selection_start,
+            selection_end=selection_end,
         )
 
     @staticmethod

@@ -100,7 +100,8 @@ def _synthetic_templates() -> dict[str, object]:
         RequestMethod,
     )
 
-    def template(requirement, symbol: str):
+    def template(requirement, symbol: str, acquisition_start, acquisition_end):
+        effective_start = acquisition_start or requirement.start_date
         return [
             PublicRequestStep(
                 step_id="synthetic-observations",
@@ -109,8 +110,8 @@ def _synthetic_templates() -> dict[str, object]:
                 endpoint="/synthetic/series",
                 public_parameters={
                     "series_id": symbol,
-                    "observation_start": requirement.start_date.isoformat(),
-                    "observation_end": requirement.end_date.isoformat(),
+                    "observation_start": effective_start.isoformat(),
+                    "observation_end": acquisition_end.isoformat(),
                 },
                 pagination_policy=PaginationPolicy.NONE,
             )
