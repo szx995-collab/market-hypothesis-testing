@@ -1401,7 +1401,6 @@ def assess_data_readiness(
     When omitted, the manifest's own hashes are re-read (self-consistency
     only) -- this is an explicit, documented limitation.
     """
-    """Run the fixed 15-step readiness pipeline over a verified snapshot."""
     _validate_plan_and_bindings(
         generated_plan, data_plan, instrument_registry, calendar_registry
     )
