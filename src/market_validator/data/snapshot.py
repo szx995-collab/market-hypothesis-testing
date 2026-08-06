@@ -374,6 +374,8 @@ def commit_acquisition_snapshot(
             for record in request_records
         ],
     )
+    if outcome.snapshot_id is None:
+        outcome = outcome.model_copy(update={"snapshot_id": snapshot_id})
     manifest_bytes = serialize_snapshot_manifest(manifest)
     outcome_bytes = serialize_execution_outcome(outcome)
 
@@ -519,6 +521,30 @@ def verify_acquisition_snapshot(
         _fail_snapshot("snapshot outcome is not succeeded")
     if outcome.snapshot_id != manifest.snapshot_id:
         _fail_snapshot("snapshot outcome id does not match the manifest")
+    if outcome.attempt_id != manifest.attempt_id:
+        _fail_snapshot("snapshot outcome attempt does not match the manifest")
+    if outcome.authorization_id != manifest.authorization_id:
+        _fail_snapshot(
+            "snapshot outcome authorization does not match the manifest"
+        )
+    if (
+        outcome.acquisition_request_plan_sha256
+        != manifest.acquisition_request_plan_sha256
+    ):
+        _fail_snapshot(
+            "snapshot outcome plan hash does not match the manifest"
+        )
+    if outcome.authorization_sha256 != manifest.authorization_sha256:
+        _fail_snapshot(
+            "snapshot outcome authorization hash does not match the manifest"
+        )
+    if (
+        outcome.authorization_receipt_sha256
+        != manifest.authorization_receipt_sha256
+    ):
+        _fail_snapshot(
+            "snapshot outcome receipt hash does not match the manifest"
+        )
     if not isinstance(plan, object) or not hasattr(plan, "acquisition_request_plan"):
         _fail_snapshot("plan must be a strictly validated generated plan")
     restored_plan = parse_acquisition_request_plan(

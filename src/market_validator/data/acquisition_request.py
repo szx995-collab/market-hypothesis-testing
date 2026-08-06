@@ -72,7 +72,7 @@ from market_validator.research.serialization import (
     calculate_research_spec_sha256,
 )
 
-ACQUISITION_REQUEST_SCHEMA_VERSION = "1.1"
+ACQUISITION_REQUEST_SCHEMA_VERSION = "1.2"
 Sha256Hex = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 
 
@@ -321,7 +321,7 @@ class UnresolvedAcquisitionRequirement(StrictResearchModel):
 class AcquisitionRequestPlan(StrictResearchModel):
     """Deterministic, provider-neutral acquisition request artifact."""
 
-    acquisition_request_schema_version: Literal["1.1"] = (
+    acquisition_request_schema_version: Literal["1.2"] = (
         ACQUISITION_REQUEST_SCHEMA_VERSION
     )
     request_plan_id: NonEmptyString
@@ -700,17 +700,22 @@ def _pre_sample_unresolved_code(
 
 
 def _fred_public_parameters(
-    requirement: DataRequirement, series_id: str
+    requirement: DataRequirement,
+    series_id: str,
+    acquisition_start: date | None = None,
+    acquisition_end: date | None = None,
 ) -> dict[str, str]:
     mode = requirement.revision_policy.mode
     output_type = "4" if mode is DataRevisionMode.INITIAL_RELEASE else "1"
+    effective_start = acquisition_start or requirement.start_date
+    effective_end = acquisition_end or requirement.end_date
     parameters: dict[str, str] = {
         "series_id": series_id,
         "file_type": "json",
         "units": "lin",
         "sort_order": "asc",
-        "observation_start": requirement.start_date.isoformat(),
-        "observation_end": requirement.end_date.isoformat(),
+        "observation_start": effective_start.isoformat(),
+        "observation_end": effective_end.isoformat(),
         "output_type": output_type,
         "limit": "100000",
     }
@@ -725,9 +730,14 @@ def _fred_public_parameters(
 
 
 def _default_fred_template(
-    requirement: DataRequirement, series_id: str
+    requirement: DataRequirement,
+    series_id: str,
+    acquisition_start: date | None,
+    acquisition_end: date,
 ) -> list[PublicRequestStep]:
-    parameters = _fred_public_parameters(requirement, series_id)
+    parameters = _fred_public_parameters(
+        requirement, series_id, acquisition_start, acquisition_end
+    )
     return [
         PublicRequestStep(
             step_id="fred-series-metadata",
@@ -757,7 +767,11 @@ def _build_request(
     snapshot: ProviderCapabilitySnapshot,
     resolution: PreSampleResolution,
     parameter_templates: Mapping[
-        str, Callable[[DataRequirement, str], list[PublicRequestStep]]
+        str,
+        Callable[
+            [DataRequirement, str, date | None, date],
+            list[PublicRequestStep],
+        ],
     ],
 ) -> PublicAcquisitionRequest:
     if AccessMode.NETWORK in snapshot.supported_access_modes:
@@ -771,7 +785,12 @@ def _build_request(
                 f"no public parameter template for network provider "
                 f"{selection.provider_id}",
             )
-        steps = template(requirement, selection.provider_symbol)
+        steps = template(
+            requirement,
+            selection.provider_symbol,
+            resolution.resolved_acquisition_start,
+            requirement.end_date,
+        )
         endpoint = selection.dataset_or_endpoint
         merged_parameters: dict[str, str] = {}
         for step in steps:
@@ -835,7 +854,11 @@ def generate_acquisition_request_plan(
     *,
     session_adapters: Mapping[str, Callable[[date, int], date]] | None = None,
     public_parameter_templates: Mapping[
-        str, Callable[[DataRequirement, str], list[PublicRequestStep]]
+        str,
+        Callable[
+            [DataRequirement, str, date | None, date],
+            list[PublicRequestStep],
+        ],
     ]
     | None = None,
 ) -> GeneratedAcquisitionRequestPlan:

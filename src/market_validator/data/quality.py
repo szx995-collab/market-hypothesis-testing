@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Iterable
 
 from market_validator.data.models import (
@@ -23,6 +23,9 @@ def build_quality_report(
     observation_rows: Iterable[ObservationRow],
     initial_issues: Iterable[DataQualityIssue] = (),
     requirement: DataRequirement | None = None,
+    *,
+    selection_start: date | None = None,
+    selection_end: date | None = None,
 ) -> tuple[list[Observation], DataQualityReport]:
     """Check parsed rows in source order and return them without silent repair."""
     issues = list(initial_issues)
@@ -60,9 +63,9 @@ def build_quality_report(
             if unexpected_identity:
                 continue
             if not (
-                requirement.start_date
+                (selection_start or requirement.start_date)
                 <= observation.session_date
-                <= requirement.end_date
+                <= (selection_end or requirement.end_date)
             ):
                 continue
             if observation.currency != requirement.currency:
